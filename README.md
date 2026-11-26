@@ -1,6 +1,6 @@
 # jupyterlite-google-drive
 
-Experimental browser-only JupyterLab extension for JupyterLite. Version 0.3.0-alpha.3 (experimental output branch). No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
+Experimental browser-only JupyterLab extension for JupyterLite. Version 0.3.0-alpha.3. No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
 
 ## Status
 
@@ -19,7 +19,7 @@ The staging directory is shared by native notebooks within the connection and st
 
 ## Experimental mounted data access
 
-In a native Google Drive notebook, File > Google Drive: Mount read-only data file (experimental) authorizes a regular file and exposes a session-scoped alias at `/drive/data/<safe-name>`. With JupyterLite filesystem synchronization enabled, ordinary Python `open` or pandas can read the remote data through the native ContentsManager/DriveFS bridge, without injecting its encoded contents into Python input history. The data are read-only, with the same 5 MiB limit and version checks. Aliases are shared by native notebooks within the connection and are cleared at reconnect or reload. Name collisions with other Drive IDs are rejected. This is not a full folder mount or persistent data dependency. The new isolated Chromium test checks actual DriveFS reads; standard GitHub Pages/service-worker compatibility is still to be verified. Use the temporary import fallback when filesystem synchronization is unavailable.
+In a native Google Drive notebook, File > Google Drive: Mount read-only data file (experimental) authorizes a regular file and exposes a session-scoped alias at `/drive/data/<safe-name>`. With JupyterLite filesystem synchronization enabled, ordinary Python `open` or pandas can read the remote data through the native ContentsManager/DriveFS bridge, without injecting its encoded contents into Python input history. The data are read-only, with the same 5 MiB limit and version checks. Aliases are shared by native notebooks within the connection and are cleared at reconnect or reload. Name collisions with other Drive IDs are rejected. This is not a full folder mount or persistent data dependency. The isolated Chromium test passed actual DriveFS reads and output export (CI run 45892804136). A second test runs the same workflow under a project URL prefix, without COOP/COEP headers, using a real controlling service worker. This emulates the GitHub Pages transport but does not replace a real Google account/browser acceptance test. Use the temporary import fallback when filesystem synchronization is unavailable.
 
 ## Experimental data access from Python
 
@@ -66,6 +66,8 @@ python scripts/build_demo.py
 python -m playwright install chromium
 python scripts/smoke_browser.py
 python scripts/smoke_drive.py
+python scripts/smoke_mount.py
+python scripts/smoke_mount.py --transport service-worker
 python -m http.server 8000 --directory dist
 ```
 
@@ -73,7 +75,7 @@ Open `http://localhost:8000/lab/index.html` directly, not inside an iframe for t
 
 ## Continuous integration and GitHub Pages
 
-The Build and test workflow runs on pushes to main and pull requests. It checks JS syntax, runs unit tests, builds the extension with jupyter-builder (JupyterLab 4.6), builds JupyterLite, then starts Chromium against the site under a project URL prefix. It verifies the local demo notebook and nine Google Drive menu commands on this branch. A separate browser integration test uses fake Google authorization, Picker and Drive HTTP responses with two independent browser contexts to exercise local import, remote update, stale-write rejection and reopening through the authorized notebook list. The native browser test executes a real Python cell using Pyodide and checks persistence of its output. Google authorization and HTTP Drive responses are simulated; no real Google login is asserted. The resulting static site is downloadable as a workflow artifact.
+The Build and test workflow runs on pushes to main and pull requests. It checks JS syntax, runs unit tests, builds the extension with jupyter-builder (JupyterLab 4.6), builds JupyterLite, then starts Chromium against the site under a project URL prefix. It verifies the local demo notebook and eleven Google Drive menu commands. A separate browser integration test uses fake Google authorization, Picker and Drive HTTP responses with two independent browser contexts to exercise local import, remote update, stale-write rejection and reopening through the authorized notebook list. The native browser test executes a real Python cell using Pyodide and checks persistence of its output. Google authorization and HTTP Drive responses are simulated; no real Google login is asserted. The resulting static site is downloadable as a workflow artifact.
 
 To publish a demo, set Settings > Pages > Source to GitHub Actions. Then either run the Build and test workflow manually with its deploy option or create repository Actions variable PAGES_ENABLED=true for automatic deployment on pushes to main. The deployment job only runs after the build and browser checks pass.
 
