@@ -89,6 +89,11 @@ class FakeDrive:
                 route.fulfill(status=200, headers=cors, content_type="text/csv", body=self.csv_data)
                 return
             value = {"id":"data-file","name":"dati.csv","version":"1","mimeType":"text/csv","size":"12","trashed":False}
+        elif url.path == "/drive/v3/files/other-data" and req.method == "GET":
+            if parse_qs(url.query).get("alt") == ["media"]:
+                route.fulfill(status=200,headers=cors,content_type="text/csv",body="x\n99\n")
+                return
+            value={"id":"other-data","name":"other.csv","version":"1","mimeType":"text/csv","size":"5","trashed":False}
         elif url.path == "/drive/v3/files" and req.method == "GET":
             value = {"files":[self.metadata(), {"id":"other","name":"ignore.csv"}]}
         elif url.path == "/drive/v3/files/demo-file" and req.method == "GET":
