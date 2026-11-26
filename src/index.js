@@ -1,4 +1,4 @@
-import {showDialog, Dialog} from '@jupyterlab/apputils';
+import {showDialog, Dialog, InputDialog} from '@jupyterlab/apputils';
 import {PageConfig} from '@jupyterlab/coreutils';
 import {IDocumentManager} from '@jupyterlab/docmanager';
 import {IMainMenu} from '@jupyterlab/mainmenu';
@@ -37,8 +37,7 @@ const plugin = {
       await auth.connect(); links = new WeakMap();
       await tell('Google Drive', 'Connected. Choose Open from Drive or Save a new copy to Drive.');
     });
-    const open = add('open', 'Google Drive: Open notebook', async () => {
-      const id = await auth.pick(); if (!id) return;
+    const openRemote = async id => {
       const {meta, content} = await drive.read(id);
       // Unique local copy: never overwrite a local notebook with the same name.
       const temp = await contents.newUntitled({type: 'notebook'});
@@ -48,6 +47,30 @@ const plugin = {
       await panel.context.ready;
       links.set(panel, {id: meta.id, name: meta.name, version: meta.version});
       await tell('Google Drive', `Opened ${meta.name} as ${temp.path}. Use Google Drive: Save to original to update the cloud file.`);
+    };
+    const open = add('open', 'Google Drive: Open notebook', async () => {
+      const id = await auth.pick(); if (id) await openRemote(id);
+    });
+    const browse = add('browse', 'Google Drive: Browse authorized notebooks', async () => {
+      const files = await drive.listNotebooks();
+      if (!files.length) {
+        await tell('Google Drive', 'No authorized notebooks found. Use Google Drive: Open notebook to select a file in Google Picker, or Save a new copy to create one.');
+        return;
+      }
+      // A numbered label is unique even if names and timestamps are identical.
+      const items = files.map((file, i) => {
+        const date = file.modifiedTime ? ' | ' + new Date(file.modifiedTime).toLocaleString() : '';
+        const access = file.capabilities?.canEdit === false ? ' | read-only' : '';
+        return `${i + 1}. ${file.name}${date}${access}`;
+      });
+      const result = await InputDialog.getItem({
+        title: 'Authorized Google Drive notebooks',
+        label: 'Choose a notebook (most recently modified first)',
+        items, editable: false, okLabel: 'Open'
+      });
+      if (!result.button.accept) return;
+      const selected = files[items.indexOf(result.value)];
+      if (selected) await openRemote(selected.id);
     });
     const save = add('save', 'Google Drive: Save to original', async () => {
       const panel = current(); const link = links.get(panel);
@@ -70,7 +93,7 @@ const plugin = {
       auth.disconnect(); links = new WeakMap();
       await tell('Google Drive', 'Disconnected. Local notebook copies remain in this browser.');
     });
-    menu.fileMenu.addGroup([connect, open, save, saveAs, disconnect], 80);
+    menu.fileMenu.addGroup([connect, open, browse, save, saveAs, disconnect], 80);
     // Load external scripts only if configured; connect itself remains a user gesture.
     void auth.prepare().then(() => {prepared = true;}).catch(e => {preparationError = String(e.message || e);});
   }

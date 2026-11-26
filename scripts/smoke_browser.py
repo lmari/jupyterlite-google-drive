@@ -25,10 +25,10 @@ def main():
                         page.goto(url, wait_until="domcontentloaded", timeout=120000)
                         expect(page.locator(".jp-Notebook").first).to_be_visible(timeout=120000)
                         page.locator(".lm-MenuBar-item").filter(has_text="File").first.click()
-                        for label in ["Connect", "Open notebook", "Save to original", "Save a new copy", "Disconnect"]:
+                        for label in ["Connect", "Open notebook", "Browse authorized notebooks", "Save to original", "Save a new copy", "Disconnect"]:
                             expect(page.get_by_text("Google Drive: " + label, exact=True)).to_be_visible(timeout=30000)
                         page.keyboard.press("Escape")
-                        print("JupyterLite notebook and five Drive menu commands are visible.")
+                        print("JupyterLite notebook and six Drive menu commands are visible.")
                     except Exception:
                         page.screenshot(path=str(root / "smoke-failure.png"), full_page=True)
                         raise

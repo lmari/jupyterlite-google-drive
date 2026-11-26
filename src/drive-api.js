@@ -24,6 +24,36 @@ export class DriveAPI {
     if (!response.ok) throw new Error(`Drive request failed (${response.status}). ${response.status === 401 ? 'Reconnect to Google Drive.' : ''}`);
     return response;
   }
+  // drive.file limits the list to files the user has authorized or the app created.
+  // Filter extensions locally: Drive's name contains query is a prefix search.
+  async listNotebooks() {
+    const notebooks = new Map();
+    const seenTokens = new Set();
+    let pageToken;
+    do {
+      const params = new URLSearchParams({
+        q: 'trashed = false',
+        spaces: 'drive',
+        corpora: 'user',
+        pageSize: '100',
+        orderBy: 'modifiedTime desc',
+        fields: 'nextPageToken,incompleteSearch,files(id,name,modifiedTime,version,mimeType,capabilities(canEdit))'
+      });
+      if (pageToken) params.set('pageToken', pageToken);
+      const page = await (await this.request(base + '?' + params)).json();
+      if (page.incompleteSearch) throw new Error('Google Drive returned an incomplete search. Retry or use Open notebook.');
+      for (const file of page.files ?? []) {
+        if (typeof file.id === 'string' && typeof file.name === 'string' &&
+            /\.ipynb$/i.test(file.name) && !file.mimeType?.startsWith('application/vnd.google-apps.')) {
+          notebooks.set(file.id, file);
+        }
+      }
+      pageToken = page.nextPageToken;
+      if (pageToken && seenTokens.has(pageToken)) throw new Error('Drive repeated a page token; retry the listing.');
+      if (pageToken) seenTokens.add(pageToken);
+    } while (pageToken);
+    return [...notebooks.values()];
+  }
   async metadata(id) {
     return (await this.request(`${base}/${encodeURIComponent(id)}?fields=id,name,version,modifiedTime,trashed,mimeType,capabilities(canEdit)`)).json();
   }

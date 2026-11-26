@@ -36,3 +36,26 @@ test('creates new file via multipart upload',async()=>{
 test('reports expired credentials',async()=>{
   const {api}=mock({status:401,body:{}}); await assert.rejects(api.metadata('abc'),/Reconnect/);
 });
+
+test('lists all authorized notebook pages, filtering Google-native and other files',async()=>{
+  const {api,calls}=mock(
+    {files:[meta,{id:'x',name:'data.csv'},{id:'folder',name:'fake.ipynb',mimeType:'application/vnd.google-apps.folder'}],nextPageToken:'next+/'},
+    {files:[{id:'xyz',name:'SECOND.IPYNB',mimeType:'application/json'},meta]}
+  );
+  const files=await api.listNotebooks();
+  assert.deepEqual(files.map(f=>f.id),['abc','xyz']);
+  assert.equal(new URL(calls[0].url).searchParams.get('q'),'trashed = false');
+  assert.equal(new URL(calls[1].url).searchParams.get('pageToken'),'next+/');
+  assert.equal(calls[0].opts.headers.Authorization,'Bearer fake-token');
+});
+test('returns an empty list when no authorized notebooks exist',async()=>{
+  const {api}=mock({files:[]}); assert.deepEqual(await api.listNotebooks(),[]);
+});
+test('rejects incomplete or looping Drive pagination',async()=>{
+  const {api}=mock({files:[],incompleteSearch:true}); await assert.rejects(api.listNotebooks(),/incomplete/);
+  const loop=mock({files:[],nextPageToken:'repeat'},{files:[],nextPageToken:'repeat'});
+  await assert.rejects(loop.api.listNotebooks(),/repeated/);
+});
+test('does not silently hide authorization failures while listing',async()=>{
+  const {api}=mock({status:401,body:{}}); await assert.rejects(api.listNotebooks(),/Reconnect/);
+});

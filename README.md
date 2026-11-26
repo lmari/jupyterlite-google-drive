@@ -1,14 +1,14 @@
 # jupyterlite-google-drive
 
-Experimental browser-only JupyterLab extension for JupyterLite. Version 0.1.0-alpha.1. No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
+Experimental browser-only JupyterLab extension for JupyterLite. Version 0.2.0-alpha.1. No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
 
 ## Status
 
-Initial source prototype. The Drive API adapter has Node tests with mocked HTTP responses. CI build, seven unit tests, browser menu activation and Pages deployment passed in run [45866198530](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45866198530). The mocked Drive integration test also passed in [run 45867383860](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45867383860): two isolated browser contexts successfully imported the same notebook, saved an edit, rejected a stale write, and reopened the updated notebook. Real Google authorization and API behavior still require a manual acceptance test. Real OAuth/Picker integration is not yet verified. Not yet appropriate for production or sensitive files.
+Initial source prototype. The Drive API adapter has Node tests with mocked HTTP responses. CI build, seven unit tests, browser menu activation and Pages deployment passed in run [45866198530](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45866198530). The mocked Drive integration test also passed in [run 45867383860](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45867383860): two isolated browser contexts successfully imported the same notebook, saved an edit, rejected a stale write, and reopened the updated notebook. The project owner reported successful real Google connection after adding the account as a test user. A complete independently verified real Drive round trip is still outstanding. Not yet appropriate for production or sensitive files.
 
 ## Workflow
 
-The File menu contains five Google Drive commands: Connect, Open notebook, Save to original, Save a new copy, Disconnect. Open imports a notebook into a unique local JupyterLite file, then remembers the remote file ID and version for the open editor only. Standard Ctrl+S is local; remote writes are explicit. The original is overwritten only after confirmation and a best-effort remote version check. The link is lost on reload, closing the editor, or reconnecting; reopen from Drive (or export a new copy). Disconnect does not delete local files. No live synchronization or native Drive file browser yet.
+The File menu contains six Google Drive commands: Connect, Open notebook, Browse authorized notebooks, Save to original, Save a new copy, Disconnect. The new Browse command lists the notebooks already accessible to the app through the drive.file scope, newest modified first. It fetches all pages, excludes other file types and disambiguates duplicate names with numbered choices. Use Open notebook (Picker) to authorize additional files. Open imports a notebook into a unique local JupyterLite file, then remembers the remote file ID and version for the open editor only. Standard Ctrl+S is local; remote writes are explicit. The original is overwritten only after confirmation and a best-effort remote version check. The link is lost on reload, closing the editor, or reconnecting; reopen from Drive (or export a new copy). Disconnect does not delete local files. This is a native JupyterLab selection dialog, not yet a mounted IDrive or a sidebar. No live synchronization or remote autosave yet.
 
 ## Google Cloud setup
 
@@ -42,7 +42,7 @@ Open `http://localhost:8000/lab/index.html` directly, not inside an iframe for t
 
 ## Continuous integration and GitHub Pages
 
-The Build and test workflow runs on pushes to main and pull requests. It checks JS syntax, runs unit tests, builds the extension with jupyter-builder (JupyterLab 4.6), builds JupyterLite, then starts Chromium against the site under a project URL prefix. It verifies the local demo notebook and five Google Drive menu commands. A separate browser integration test uses fake Google authorization, Picker and Drive HTTP responses with two independent browser contexts to exercise local import, remote update and stale-write rejection. No real Google login or Python cell execution is asserted by these tests. The resulting static site is downloadable as a workflow artifact.
+The Build and test workflow runs on pushes to main and pull requests. It checks JS syntax, runs unit tests, builds the extension with jupyter-builder (JupyterLab 4.6), builds JupyterLite, then starts Chromium against the site under a project URL prefix. It verifies the local demo notebook and six Google Drive menu commands. A separate browser integration test uses fake Google authorization, Picker and Drive HTTP responses with two independent browser contexts to exercise local import, remote update, stale-write rejection and reopening through the authorized notebook list. No real Google login or Python cell execution is asserted by these tests. The resulting static site is downloadable as a workflow artifact.
 
 To publish a demo, set Settings > Pages > Source to GitHub Actions. Then either run the Build and test workflow manually with its deploy option or create repository Actions variable PAGES_ENABLED=true for automatic deployment on pushes to main. The deployment job only runs after the build and browser checks pass.
 
@@ -61,7 +61,7 @@ Expected URL: https://lmari.github.io/jupyterlite-google-drive/lab/index.html
 
 ## Security / limitations
 
-Access tokens are kept in JS memory, not persisted in storage or logged. They expire and require user-initiated reauthorization. Browser code is not an isolation boundary against other scripts in the same page; do not run untrusted notebooks/extensions in a connected session. Imported notebooks remain in browser storage after disconnect. No automatic uploads, delete operations, or file listing in this release. Drive API access and Google OAuth policies must be checked before public release. The version check is best effort, not a transactional lock.
+Access tokens are kept in JS memory, not persisted in storage or logged. They expire and require user-initiated reauthorization. Browser code is not an isolation boundary against other scripts in the same page; do not run untrusted notebooks/extensions in a connected session. Imported notebooks remain in browser storage after disconnect. No automatic uploads or delete operations. Listing is limited by the existing OAuth scope; no additional permissions are requested. Drive API access and Google OAuth policies must be checked before public release. The version check is best effort, not a transactional lock.
 
 ## References
 
@@ -73,4 +73,4 @@ Access tokens are kept in JS memory, not persisted in storage or logged. They ex
 
 ## Roadmap
 
-0.1: verify build and browser round trip; 0.2: native Contents.IDrive and auto-save with explicit conflict strategy; 0.3: data file access from kernel; 1.0: public deployment, tests, privacy documentation and hardening.
+0.1: verified build and mocked browser round trip; 0.2-alpha.1: authorized notebook list; 0.2 next: native Contents.IDrive and auto-save with explicit conflict strategy (see [design](docs/native-drive.md)); 0.3: data file access from kernel; 1.0: public deployment, tests, privacy documentation and hardening.

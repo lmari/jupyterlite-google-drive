@@ -63,7 +63,9 @@ class FakeDrive:
             route.fulfill(status=204, headers=cors)
             return
         assert req.headers.get("authorization") == "Bearer mock-token"
-        if url.path == "/drive/v3/files/demo-file" and req.method == "GET":
+        if url.path == "/drive/v3/files" and req.method == "GET":
+            value = {"files":[self.metadata(), {"id":"other","name":"ignore.csv"}]}
+        elif url.path == "/drive/v3/files/demo-file" and req.method == "GET":
             value = self.notebook if parse_qs(url.query).get("alt") == ["media"] else self.metadata()
         elif url.path == "/upload/drive/v3/files/demo-file" and req.method == "PATCH":
             self.notebook = json.loads(req.post_data)
@@ -87,6 +89,18 @@ def dialog(page, message):
 
 def open_remote(page):
     command(page, "Open notebook")
+    dialog(page, "Opened remote.ipynb")
+    cell = page.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
+    expect(cell).to_be_visible(timeout=30000)
+    return cell
+
+def browse_remote(page):
+    command(page, "Browse authorized notebooks")
+    modal = page.locator(".jp-Dialog").last
+    expect(modal).to_contain_text("Authorized Google Drive notebooks", timeout=30000)
+    expect(modal.locator("select option")).to_have_count(1)
+    expect(modal.locator("select option").first).to_contain_text("remote.ipynb")
+    modal.locator(".jp-Dialog-button.jp-mod-accept").click()
     dialog(page, "Opened remote.ipynb")
     cell = page.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
     expect(cell).to_be_visible(timeout=30000)
@@ -153,7 +167,7 @@ def main():
                         assert fake.writes == 1
 
                         # Reopen from simulated Drive on the other browser.
-                        cell_b = open_remote(b)
+                        cell_b = browse_remote(b)
                         expect(cell_b).to_have_text("6 * 7")
                         ctx_a.close()
                         ctx_b.close()

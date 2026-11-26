@@ -1,7 +1,7 @@
 {
   "name": "jupyterlite-google-drive",
-  "version": "0.1.0-alpha.1",
-  "description": "Explicit notebook import and export between JupyterLite and Google Drive",
+  "version": "0.2.0-alpha.1",
+  "description": "Browser-only notebook access and explicit cloud saves for JupyterLite",
   "license": "BSD-3-Clause",
   "type": "module",
   "main": "src/index.js",
