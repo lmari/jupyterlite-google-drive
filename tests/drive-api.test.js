@@ -59,3 +59,27 @@ test('rejects incomplete or looping Drive pagination',async()=>{
 test('does not silently hide authorization failures while listing',async()=>{
   const {api}=mock({status:401,body:{}}); await assert.rejects(api.listNotebooks(),/Reconnect/);
 });
+
+test('downloads binary data without JSON conversion and checks version',async()=>{
+  const dataMeta={...meta,name:'dati.csv',mimeType:'text/csv',size:'4'};
+  const calls=[];
+  const api=new DriveAPI(()=>'fake-token',async(url,opts)=>{
+    calls.push(url);
+    return url.includes('alt=media')?new Response(Uint8Array.of(0,255,1,2)):Response.json(dataMeta);
+  });
+  const result=await api.readData('abc');
+  assert.deepEqual([...result.bytes],[0,255,1,2]);assert.equal(calls.length,3);
+});
+test('rejects native Google files, notebooks, oversize data and changed versions',async()=>{
+  for(const extra of [{name:'test.ipynb',mimeType:'application/json'},{name:'Sheet',mimeType:'application/vnd.google-apps.spreadsheet'},{name:'large.csv',mimeType:'text/csv',size:'5242881'}]){
+    const {api,calls}=mock({...meta,...extra});await assert.rejects(api.readData('abc'));assert.equal(calls.length,1);
+  }
+  const m={...meta,name:'dati.csv',mimeType:'text/csv'};
+  const {api}=mock(m,{value:3},{...m,version:'2'});
+  await assert.rejects(api.readData('abc'),/changed/);
+});
+test('enforces download limit even when Drive metadata does not report size',async()=>{
+  const m={...meta,name:'dati.bin',mimeType:'application/octet-stream'};
+  const api=new DriveAPI(()=>'fake-token',async url=>url.includes('alt=media')?new Response(new Uint8Array(5242881)):Response.json(m));
+  await assert.rejects(api.readData('abc'),/5 MiB/);
+});

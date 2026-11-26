@@ -23,7 +23,7 @@ MOCK_GOOGLE = """
     setAppId() { return this; }
     setOrigin() { return this; }
     setCallback(cb) { this.cb = cb; return this; }
-    build() { return {setVisible: () => this.cb({action:'picked',docs:[{id:'demo-file'}]})}; }
+    build() { return {setVisible: () => this.cb({action:'picked',docs:[{id:window.__drivePickId || 'demo-file'}]})}; }
   }
   window.google = {
     accounts: {oauth2: {
@@ -52,6 +52,7 @@ class FakeDrive:
         self.hold_next_write = False
         self.pending_write = None
         self.unavailable = False
+        self.csv_data = "x,y\n2,3\n4,5\n"
 
     def metadata(self):
         return {"id":"demo-file", "name":"remote.ipynb", "version":str(self.version),
@@ -69,7 +70,12 @@ class FakeDrive:
         if self.unavailable:
             route.fulfill(status=503, headers=cors, json={"error":"simulated outage"})
             return
-        if url.path == "/drive/v3/files" and req.method == "GET":
+        if url.path == "/drive/v3/files/data-file" and req.method == "GET":
+            if parse_qs(url.query).get("alt") == ["media"]:
+                route.fulfill(status=200, headers=cors, content_type="text/csv", body=self.csv_data)
+                return
+            value = {"id":"data-file","name":"dati.csv","version":"1","mimeType":"text/csv","size":"12","trashed":False}
+        elif url.path == "/drive/v3/files" and req.method == "GET":
             value = {"files":[self.metadata(), {"id":"other","name":"ignore.csv"}]}
         elif url.path == "/drive/v3/files/demo-file" and req.method == "GET":
             value = self.notebook if parse_qs(url.query).get("alt") == ["media"] else self.metadata()
@@ -239,6 +245,24 @@ def main():
                             raise AssertionError("Executed Python output did not persist on simulated Drive")
 
                         print("Pyodide executed the native notebook and its output persisted.")
+                        # Transfer a CSV through the live notebook kernel, not via
+                        # service worker synchronization or an OAuth token in Python.
+                        a.wait_for_timeout(1000)
+                        a.evaluate("window.__drivePickId = 'data-file'")
+                        command(a, "Import data into Python")
+                        dialog(a, "Import data into Python?")
+                        dialog(a, "Data available in Python at /tmp/jupyterlite-drive/dati.csv")
+                        # Change remote data to prove the collision leaves original bytes untouched.
+                        fake.csv_data = "x,y\n10,3\n40,5\n"
+                        command(a, "Import data into Python")
+                        dialog(a, "Import data into Python?")
+                        dialog(a, "temporary file with this name already exists")
+                        a.evaluate("window.__drivePickId = 'demo-file'")
+                        edit_cell(a, cell, 'import csv; sum(int(r["x"]) for r in csv.DictReader(open("/tmp/jupyterlite-drive/dati.csv")))')
+                        a.keyboard.press("Control+Enter")
+                        expect(output).to_have_text("6", timeout=60000)
+                        print("Imported Drive CSV was read by real Python in the native notebook.")
+
                         # Delay the next upload while the user continues editing.
                         # The completed upload must contain the captured snapshot,
                         # and the later edit must stay dirty for JupyterLab autosave.
