@@ -1,0 +1,7 @@
+.venv/
+node_modules/
+labextension/
+.extra-labextensions/
+dist/
+demo/jupyter-lite.json
+__pycache__/
