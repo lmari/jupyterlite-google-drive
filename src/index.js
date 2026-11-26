@@ -167,12 +167,27 @@ const plugin = {
       await transferData(kernel,meta.name,bytes);
       await tell('Google Drive', `Data available in Python at ${path}. Example: open("${path}", "rb"). Temporary copy only; no synchronization.`);
     });
+    const mountData = add('mount-data', 'Google Drive: Mount read-only data file (experimental)', async () => {
+      const panel = current();
+      await panel.context.ready;
+      if (!panel.context.path.startsWith(native.name + ':')) throw new Error('Open a native Google Drive notebook first. For local notebooks, use Import data into Python.');
+      const id = await auth.pick(); if (!id) return;
+      const meta = await drive.metadata(id);
+      const answer = await showDialog({
+        title:'Mount read-only data?',
+        body:`Expose ${meta.name} to native Google Drive notebooks in this browser session? Reads retrieve the file from Google Drive. Writes are disabled. Python filesystem access requires JupyterLite filesystem synchronization; if unavailable use Import data into Python.`,
+        buttons:[Dialog.cancelButton(),Dialog.okButton({label:'Mount'})]
+      });
+      if (!answer.button.accept) return;
+      const path = native.mountData(meta);
+      await tell('Google Drive', `Mounted /drive/${path}. In a native notebook with filesystem synchronization enabled, use open("/drive/${path}", "rb"). Mounts expire on reconnect or refresh.`);
+    });
     const disconnect = add('disconnect', 'Google Drive: Disconnect', async () => {
       requireClosed();
       auth.disconnect(); links = new WeakMap(); native.reset();
       await tell('Google Drive', 'Disconnected. Local notebook copies remain in this browser.');
     });
-    menu.fileMenu.addGroup([connect, open, browse, nativeOpen, save, saveAs, recover, importData, disconnect], 80);
+    menu.fileMenu.addGroup([connect, open, browse, nativeOpen, save, saveAs, recover, importData, mountData, disconnect], 80);
     // Load external scripts only if configured; connect itself remains a user gesture.
     void auth.prepare().then(() => {prepared = true;}).catch(e => {preparationError = String(e.message || e);});
   }

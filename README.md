@@ -1,10 +1,14 @@
 # jupyterlite-google-drive
 
-Experimental browser-only JupyterLab extension for JupyterLite. Version 0.3.0-alpha.1 (experimental data branch). No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
+Experimental browser-only JupyterLab extension for JupyterLite. Version 0.3.0-alpha.2 (experimental mount branch). No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
 
 ## Status
 
 Initial source prototype. The Drive API adapter has Node tests with mocked HTTP responses. CI build, seven unit tests, browser menu activation and Pages deployment passed in run [45866198530](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45866198530). The mocked Drive integration test also passed in [run 45867383860](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45867383860): two isolated browser contexts successfully imported the same notebook, saved an edit, rejected a stale write, and reopened the updated notebook. The project owner reported successful real Google connection after adding the account as a test user. A complete independently verified real Drive round trip is still outstanding. Not yet appropriate for production or sensitive files.
+
+## Experimental mounted data access
+
+In a native Google Drive notebook, File > Google Drive: Mount read-only data file (experimental) authorizes a regular file and exposes a session-scoped alias at `/drive/data/<safe-name>`. With JupyterLite filesystem synchronization enabled, ordinary Python `open` or pandas can read the remote data through the native ContentsManager/DriveFS bridge, without injecting its encoded contents into Python input history. The data are read-only, with the same 5 MiB limit and version checks. Aliases are shared by native notebooks within the connection and are cleared at reconnect or reload. Name collisions with other Drive IDs are rejected. This is not a full folder mount or persistent data dependency. The new isolated Chromium test checks actual DriveFS reads; standard GitHub Pages/service-worker compatibility is still to be verified. Use the temporary import fallback when filesystem synchronization is unavailable.
 
 ## Experimental data access from Python
 
