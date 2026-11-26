@@ -44,12 +44,16 @@ jobs:
         run: python -m playwright install --with-deps chromium
       - name: Test menu activation in browser
         run: python scripts/smoke_browser.py
+      - name: Test two-browser Drive round trip (mocked Google)
+        run: python scripts/smoke_drive.py
       - name: Upload diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: smoke-diagnostics
-          path: smoke-failure.png
+          path: |
+            smoke-failure.png
+            drive-failure-*.png
           if-no-files-found: ignore
       - name: Inject public OAuth configuration and rebuild for deployment
         if: github.ref == 'refs/heads/main' && (vars.PAGES_ENABLED == 'true' || inputs.deploy == true)
