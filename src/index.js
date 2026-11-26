@@ -366,22 +366,33 @@ const plugin = {
     native.fileChanged.connect(refreshSidebar);
     const showPanel='jupyterlite-google-drive:show-panel';
     app.commands.addCommand(showPanel,{label:args=>args.inDriveMenu?'Show workspace':'Google Drive: Show workspace',execute:()=>app.shell.activateById(sidebar.id)});
-    // One top-level File item. Preserve command IDs and full labels outside
-    // this submenu, so the sidebar and command registry are unaffected.
-    const driveMenu=new Menu({commands:app.commands});
-    driveMenu.id='jupyterlite-google-drive-menu';
-    driveMenu.title.label='Google Drive';
-    const groups=[
-      [{command:showPanel},connect,renew,disconnect],
-      [nativeOpen,open,browse,save,saveAs],
-      [mountData,addDataDependency,removeDataDependency,restoreData,rememberData,importData],
-      [exportData,downloadOutput,recover,downloadNotebook]
-    ];
-    groups.forEach((group,i)=>{
-      if(i)driveMenu.addItem({type:'separator'});
-      group.forEach(item=>driveMenu.addItem({...item,args:{inDriveMenu:true}}));
-    });
-    menu.fileMenu.addGroup([{type:'submenu',submenu:driveMenu}],80);
+    // Two compact File entries. Keep the ordinary native workflow separate
+    // from account switching, legacy local-copy and recovery operations.
+    const buildMenu=(id,title,groups)=>{
+      const submenu=new Menu({commands:app.commands});
+      submenu.id=id;
+      submenu.title.label=title;
+      groups.forEach((group,i)=>{
+        if(i)submenu.addItem({type:'separator'});
+        group.forEach(item=>submenu.addItem({...item,args:{inDriveMenu:true}}));
+      });
+      return submenu;
+    };
+    const driveMenu=buildMenu('jupyterlite-google-drive-menu','Google Drive',[
+      [{command:showPanel},connect,renew],
+      [nativeOpen,saveAs],
+      [mountData,addDataDependency,restoreData,exportData]
+    ]);
+    const advancedMenu=buildMenu('jupyterlite-google-drive-advanced-menu','Google Drive (advanced)',[
+      [open,browse,save],
+      [removeDataDependency,rememberData,importData],
+      [recover,downloadNotebook,downloadOutput],
+      [disconnect]
+    ]);
+    menu.fileMenu.addGroup([
+      {type:'submenu',submenu:driveMenu},
+      {type:'submenu',submenu:advancedMenu}
+    ],80);
     // Load external scripts only if configured; connect itself remains a user gesture.
     void auth.prepare().then(() => {prepared = true;refreshSidebar();}).catch(e => {preparationError = String(e.message || e);refreshSidebar();});
   }
