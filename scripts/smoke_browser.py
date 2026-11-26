@@ -33,7 +33,17 @@ def main():
                         expect(workspace.get_by_role("heading",name="Google Drive",exact=True)).to_be_visible()
                         expect(workspace.get_by_role("status")).to_contain_text("Configuration unavailable",timeout=30000)
                         expect(workspace.get_by_role("button",name="Connect to Google Drive")).to_be_disabled()
-                        print("JupyterLite notebook and nineteen Drive menu commands are visible.")
+                        advanced=workspace.locator("details").filter(has_text="Advanced actions")
+                        expect(advanced).to_be_visible()
+                        expect(advanced).not_to_have_attribute("open","")
+                        expect(workspace.get_by_role("button",name="Download notebook recovery file")).to_be_visible()
+                        expect(workspace.get_by_role("button",name="Import temporary data copy…")).to_be_hidden()
+                        advanced.locator("summary").click()
+                        expect(workspace.get_by_role("button",name="Import temporary data copy…")).to_be_visible()
+                        expect(workspace.get_by_role("button",name="Save local recovery copy")).to_be_visible()
+                        advanced.locator("summary").click()
+                        expect(workspace.get_by_role("button",name="Import temporary data copy…")).to_be_hidden()
+                        print("JupyterLite notebook, nineteen commands and collapsible advanced actions are verified.")
                     except Exception:
                         page.screenshot(path=str(root / "smoke-failure.png"), full_page=True)
                         raise

@@ -1,14 +1,18 @@
 # jupyterlite-google-drive
 
-Experimental browser-only JupyterLab extension for JupyterLite. Version 0.5.0-alpha.3. No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
+Experimental browser-only JupyterLab extension for JupyterLite. Version 0.6.0-beta.0 (classroom beta candidate). No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
 
 ## Status
 
-Experimental, not intended for sensitive files or production. The project owner has successfully connected a real Google account and reported the early native editor workflow working. The latest validated release (0.5 alpha 2) passed [45 unit tests and end-to-end browser tests](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45902799846), including live Python execution, both filesystem transports, notebook autosave and conflict recovery, binary export, same-account renewal and fresh-browser dependency restoration. CI uses real JupyterLite/Pyodide but mocked Google services. Full acceptance on GitHub Pages with real Google accounts remains outstanding.
+Experimental, not intended for sensitive files or production. The project owner has successfully connected a real Google account and reported the early native editor workflow working. The latest validated release (0.5 alpha 3) passed [47 unit tests and end-to-end browser tests](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45903501598), including live Python execution, both filesystem transports, notebook autosave and conflict recovery, binary export, same-account renewal and fresh-browser dependency restoration. CI uses real JupyterLite/Pyodide but mocked Google services. Full acceptance on GitHub Pages with real Google accounts remains outstanding.
 
 [Open the published experimental demo](https://lmari.github.io/jupyterlite-google-drive/lab/index.html). See [Google Cloud setup](docs/google-cloud.md) for running your own deployment.
 
-## Google Drive workspace (0.4 alpha)
+## Classroom beta candidate
+
+The Italian guided notebook `primi-passi.ipynb` is included in the demo; the [student quickstart](docs/student-quickstart-it.md) explains the complete workflow. Advanced actions are grouped in a collapsible sidebar section. All existing File menu commands remain accessible. This candidate is not yet a classroom-ready release: complete the [real-account acceptance checklist](docs/acceptance.md) before pilot use. No new OAuth scopes or persistence changes.
+
+## Google Drive workspace
 
 Open File > Google Drive: Show workspace or the Drive tab in the left sidebar. The panel reports authorization state (not network health), the latest observed notebook save status (loading, loaded, saving, unsaved, acknowledged, read-only or failed), the current notebook's persistence mode, authorized notebooks after explicit refresh, mounted data paths and temporary output paths. Open an already-authorized notebook directly in the native editor, or use Picker to select another file. All existing File menu commands remain available. Native Save status refers to the current editor's acknowledged snapshot, not proof of global synchronization. A newer edit during upload remains unsaved. A remote save failure offers local recovery. Saving a new Drive copy of a native notebook does not change the original backing file. No extra OAuth scopes, persistent credentials, folder tree, or changes to remote save semantics. The authorization status updates on expiry; Renew authorization verifies the original account via Drive about.get and preserves native editors, mounted data and staged outputs. Switching accounts or disconnecting still requires closing native editors and confirming discard of temporary output. Actual Google account acceptance remains manual.
 

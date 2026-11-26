@@ -22,6 +22,7 @@ export class DriveSidebar extends Widget {
       background:'var(--jp-layout-color1)',fontSize:'var(--jp-ui-font-size1)',boxSizing:'border-box'});
     this.commands=commands;this.state=state;
     this.lastState='';
+    this.advancedOpen=false;
     this.timer=globalThis.setInterval(()=>this.refresh(),1000);
     this.refresh();
   }
@@ -58,10 +59,17 @@ export class DriveSidebar extends Widget {
       b.addEventListener('click',()=>{void this.commands.execute('jupyterlite-google-drive:'+command,args);});
       return b;
     };
+    const advanced=element('details');
+    advanced.open=this.advancedOpen;
+    advanced.addEventListener('toggle',()=>{this.advancedOpen=advanced.open;});
+    const summary=element('summary','Advanced actions');
+    summary.style.cursor='pointer';advanced.append(summary);
+    const advancedBody=element('div');Object.assign(advancedBody.style,{display:'flex',flexDirection:'column',gap:'8px',paddingTop:'8px'});advanced.append(advancedBody);
     const connected=s.auth==='connected';
     if(s.hasAccount) body.append(button('Renew authorization','renew',s.prepared));
-    body.append(button(s.hasAccount?'Switch Google account':'Connect to Google Drive','connect',s.prepared));
-    body.append(button('Disconnect from Google Drive','disconnect',s.auth!=='disconnected'));
+    if(s.hasAccount)advancedBody.append(button('Switch Google account','connect',s.prepared));
+    else body.append(button('Connect to Google Drive','connect',s.prepared));
+    advancedBody.append(button('Disconnect from Google Drive','disconnect',s.auth!=='disconnected'));
     const section=(title,desc)=>{
       const h=element('h3',title);h.style.margin='12px 0 0';
       body.append(h);const p=element('div',desc);p.style.color='var(--jp-ui-font-color2)';body.append(p);
@@ -80,7 +88,7 @@ export class DriveSidebar extends Widget {
       if(s.saveStatus.at)body.append(element('div','Last acknowledged upload: '+new Date(s.saveStatus.at).toLocaleTimeString()));
     }
     body.append(button('Save notebook as new Drive copy','save-as',connected&&s.hasNotebook));
-    body.append(button('Save local recovery copy','recover',s.hasNotebook));
+    advancedBody.append(button('Save local recovery copy','recover',s.hasNotebook));
     body.append(button('Download notebook recovery file','download-notebook',s.hasNotebook));
     section('Authorized notebooks','Only files already authorized for this app. Select additional files with Google Picker.');
     body.append(button('Refresh notebook list','refresh-list',connected));
@@ -99,7 +107,7 @@ export class DriveSidebar extends Widget {
     }
     section('Mounted data','Read-only files under /drive/data/ in native notebooks.');
     body.append(button('Mount data file…','mount-data',connected&&s.isNative));
-    body.append(button('Import temporary data copy…','import-data',connected&&s.hasNotebook));
+    advancedBody.append(button('Import temporary data copy…','import-data',connected&&s.hasNotebook));
     if(!s.data.length)body.append(element('div','No mounted data.'));
     for(const path of s.data)body.append(element('code','/drive/'+path));
     if(s.isNative) {
@@ -115,7 +123,7 @@ export class DriveSidebar extends Widget {
       }
       body.append(button('Add selected dependency…','add-dependency',connected&&s.dependencyEditable&&!s.dependencyError&&s.data.some(p=>!s.dependencies.some(d=>d.path===p))));
       body.append(button('Remove recorded dependency…','remove-dependency',s.dependencyEditable&&!s.dependencyError&&s.dependencies.length>0));
-      body.append(button('Replace with all mounted data…','remember-data',connected&&s.dependencyEditable));
+      advancedBody.append(button('Replace with all mounted data…','remember-data',connected&&s.dependencyEditable));
       body.append(button('Restore notebook data dependencies','restore-data',connected&&!s.dependencyError&&s.dependencies.length>0));
     }
     section('Python output','Temporary files under /drive/output/. Export before switching accounts or reloading.');
@@ -123,6 +131,7 @@ export class DriveSidebar extends Widget {
     for(const path of s.outputs)body.append(element('code','/drive/'+path));
     body.append(button('Export output to Drive…','export-data',connected&&s.outputs.length>0));
     body.append(button('Download output locally…','download-output',s.outputs.length>0));
+    body.append(advanced);
     if(s.busy)body.append(element('div','Operation in progress…'));
     this.node.replaceChildren(body);
   }
