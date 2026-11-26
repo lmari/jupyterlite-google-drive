@@ -6,6 +6,7 @@ import {INotebookTracker} from '@jupyterlab/notebook';
 import {GoogleAuth} from './auth.js';
 import {DriveAPI, notebookName} from './drive-api.js';
 import {NativeDrive} from './native-drive.js';
+import {dataPath, transferData} from './kernel-data.js';
 
 const plugin = {
   id: 'jupyterlite-google-drive:plugin', autoStart: true,
@@ -144,12 +145,34 @@ const plugin = {
       docs.openOrReveal(temp.path,'Notebook');
       await tell('Google Drive', `Local recovery copy saved as ${temp.path}. The original notebook was not changed.`);
     });
+    const importData = add('import-data', 'Google Drive: Import data into Python', async () => {
+      const panel = current();
+      await panel.context.ready;
+      const kernel = panel.sessionContext.session?.kernel;
+      if (!kernel || kernel.name !== 'python' || kernel.status !== 'idle') {
+        throw new Error('Select a notebook with a running, idle Pyodide Python kernel. Run a cell first if needed.');
+      }
+      const id = await auth.pick(); if (!id) return;
+      const {meta,bytes} = await drive.readData(id);
+      const path = dataPath(meta.name);
+      const answer = await showDialog({
+        title:'Import data into Python?',
+        body:`Copy ${meta.name} (${bytes.byteLength} bytes) to ${path} in this notebook's running Python kernel? It is a temporary snapshot, lost when the kernel is restarted, and changes will not be uploaded to Google Drive.`,
+        buttons:[Dialog.cancelButton(),Dialog.okButton({label:'Import'})]
+      });
+      if (!answer.button.accept) return;
+      if (panel.isDisposed || panel.sessionContext.session?.kernel !== kernel) {
+        throw new Error('The original Python kernel changed. Retry from the notebook.');
+      }
+      await transferData(kernel,meta.name,bytes);
+      await tell('Google Drive', `Data available in Python at ${path}. Example: open("${path}", "rb"). Temporary copy only; no synchronization.`);
+    });
     const disconnect = add('disconnect', 'Google Drive: Disconnect', async () => {
       requireClosed();
       auth.disconnect(); links = new WeakMap(); native.reset();
       await tell('Google Drive', 'Disconnected. Local notebook copies remain in this browser.');
     });
-    menu.fileMenu.addGroup([connect, open, browse, nativeOpen, save, saveAs, recover, disconnect], 80);
+    menu.fileMenu.addGroup([connect, open, browse, nativeOpen, save, saveAs, recover, importData, disconnect], 80);
     // Load external scripts only if configured; connect itself remains a user gesture.
     void auth.prepare().then(() => {prepared = true;}).catch(e => {preparationError = String(e.message || e);});
   }

@@ -1,5 +1,6 @@
 const base = 'https://www.googleapis.com/drive/v3/files';
 const upload = 'https://www.googleapis.com/upload/drive/v3/files';
+export const maxDataBytes = 5 * 1024 * 1024;
 export const scope = 'https://www.googleapis.com/auth/drive.file';
 export function validateNotebook(value) {
   if (!value || value.nbformat !== 4 || !Array.isArray(value.cells) ||
@@ -55,7 +56,45 @@ export class DriveAPI {
     return [...notebooks.values()];
   }
   async metadata(id) {
-    return (await this.request(`${base}/${encodeURIComponent(id)}?fields=id,name,version,modifiedTime,trashed,mimeType,capabilities(canEdit)`)).json();
+    return (await this.request(`${base}/${encodeURIComponent(id)}?fields=id,name,version,modifiedTime,trashed,mimeType,size,capabilities(canEdit)`)).json();
+  }
+  async readData(id) {
+    const before = await this.metadata(id);
+    if (before.trashed || typeof before.name !== 'string' ||
+        /\.ipynb$/i.test(before.name) || !before.mimeType ||
+        before.mimeType.startsWith('application/vnd.google-apps.')) {
+      throw new Error('Select a regular data file, not a notebook, folder or Google-native document.');
+    }
+    if (Number(before.size) > maxDataBytes) throw new Error('Data file exceeds the 5 MiB experimental limit.');
+    if (!before.version) throw new Error('Drive did not return a file version.');
+    const response = await this.request(`${base}/${encodeURIComponent(id)}?alt=media`);
+    if (Number(response.headers.get('content-length')) > maxDataBytes) {
+      await response.body?.cancel();
+      throw new Error('Data file exceeds the 5 MiB experimental limit.');
+    }
+    const reader = response.body?.getReader();
+    const chunks = [];
+    let total = 0;
+    if (reader) {
+      try {
+        while (true) {
+          const {done,value} = await reader.read();
+          if (done) break;
+          total += value.byteLength;
+          if (total > maxDataBytes) {
+            await reader.cancel();
+            throw new Error('Data file exceeds the 5 MiB experimental limit.');
+          }
+          chunks.push(value);
+        }
+      } finally { reader.releaseLock(); }
+    }
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk,offset); offset += chunk.byteLength; }
+    const after = await this.metadata(id);
+    if (after.trashed || before.version !== after.version) throw new Error('Data file changed while downloading; retry.');
+    return {meta:after,bytes};
   }
   async read(id) {
     const before = await this.metadata(id);
