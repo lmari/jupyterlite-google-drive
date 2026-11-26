@@ -8,6 +8,7 @@ import {DriveAPI, notebookName} from './drive-api.js';
 import {NativeDrive} from './native-drive.js';
 import {dataPath, transferData} from './kernel-data.js';
 import {DriveSidebar} from './sidebar.js';
+import {describeSave} from './save-status.js';
 
 const plugin = {
   id: 'jupyterlite-google-drive:plugin', autoStart: true,
@@ -25,6 +26,7 @@ const plugin = {
     const native = new NativeDrive(drive);
     contents.addDrive(native);
     const nativePanels = new Set();
+    const saveFailures = new WeakMap();
     const requireClosed = () => {
       if (nativePanels.size || native.hasPendingSave) throw new Error('Close all experimental Google Drive notebooks before reconnecting or disconnecting. Export unsaved work first.');
     };
@@ -110,19 +112,22 @@ const plugin = {
       if (meta.trashed || !/\.ipynb$/i.test(meta.name)) throw new Error('Select a non-trashed .ipynb file.');
       const path = native.mount(id, meta.name);
       const panel = docs.openOrReveal(native.name + ':' + path, 'Notebook');
-      if (!panel) throw new Error('Could not open native notebook.');
+      if (!panel) { native.release(path); throw new Error('Could not open native notebook.'); }
       if (!nativePanels.has(panel)) {
         nativePanels.add(panel);
         // JupyterLab clears dirty on successful save, even if the editor
         // changed after the snapshot was taken. Compare to the uploaded bytes.
         const guardDirty = (_sender, state) => {
           if (state === 'completed' && !panel.isDisposed) {
+            saveFailures.delete(panel);
             if (native.hasUnsavedChanges(path, panel.context.model.toJSON())) {
               panel.context.model.dirty = true;
             }
           } else if (state === 'failed' && !panel.isDisposed) {
+            saveFailures.set(panel,true);
             panel.context.model.dirty = true;
           }
+          refreshSidebar();
         };
         panel.context.saveState.connect(guardDirty);
         panel.disposed.connect(() => {
@@ -135,7 +140,9 @@ const plugin = {
       await tell('Google Drive', 'Opened native notebook. Standard Save writes to Google Drive. For recovery, use Google Drive: Save local recovery copy.');
     });
     const save = add('save', 'Google Drive: Save to original', async () => {
-      const panel = current(); const link = links.get(panel);
+      const panel = current();
+      if (panel.context.path.startsWith(native.name+':')) throw new Error('This notebook is already remote. Use standard Save (Ctrl+S) to update its original.');
+      const link = links.get(panel);
       if (!link) throw new Error('No remote link for this notebook. Reopen from Drive or save a new copy.');
       const answer = await showDialog({title: 'Update Google Drive?', body: `Overwrite ${link.name} with the current notebook?`, buttons: [Dialog.cancelButton(), Dialog.okButton()]});
       if (!answer.button.accept) return;
@@ -146,10 +153,12 @@ const plugin = {
     });
     const saveAs = add('save-as', 'Google Drive: Save a new copy', async () => {
       const panel = current(); await panel.context.ready;
-      const name = notebookName(panel.context.path.split('/').pop());
+      const nativePath=panel.context.path.startsWith(native.name+':');
+      const info=nativePath?native.saveInfo(contents.localPath(panel.context.path)):null;
+      const name = notebookName(info?.name || panel.context.path.split('/').pop());
       const meta = await drive.create(name, panel.context.model.toJSON());
-      links.set(panel, {id: meta.id, name: meta.name, version: meta.version});
-      await tell('Google Drive', `Created ${meta.name} in My Drive.`);
+      if (!nativePath) links.set(panel, {id: meta.id, name: meta.name, version: meta.version});
+      await tell('Google Drive', `Created ${meta.name} in My Drive.`+(nativePath?' Standard Save still targets the originally opened notebook.':''));
     });
     const recover = add('recover', 'Google Drive: Save local recovery copy', async () => {
       const panel = current();
@@ -225,7 +234,10 @@ const plugin = {
       const panel=tracker.currentWidget;
       const hasNotebook=!!panel && !panel.isDisposed && app.shell.currentWidget===panel;
       const isNative=hasNotebook && panel.context.path.startsWith(native.name+':');
-      return {prepared,preparationError,busy,auth:auth.status,hasNotebook,isNative,
+      const info=isNative?native.saveInfo(contents.localPath(panel.context.path)):null;
+      const saveStatus=hasNotebook?describeSave({isNative,linked:links.has(panel),dirty:panel.context.model.dirty,info,failed:saveFailures.has(panel),auth:auth.status}):null;
+      return {prepared,preparationError,busy,auth:auth.status,hasNotebook,isNative,saveStatus,
+        notebookName:hasNotebook?(info?.name || panel.context.path.split('/').pop()):'',
         current:!hasNotebook?'No active notebook':isNative?'Remote notebook — standard Save and autosave write to Drive':
           links.has(panel)?'Local copy — explicit Save to original writes to Drive':'Local notebook — browser storage',
         files:auth.status==='connected'?authorizedFiles.map(f=>({id:f.id,name:f.name,readOnly:f.capabilities?.canEdit===false,

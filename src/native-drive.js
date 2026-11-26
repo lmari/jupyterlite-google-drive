@@ -20,6 +20,11 @@ export class NativeDrive {
   #generation = 0;
   constructor(api) { this.api = api; }
 
+  saveInfo(path) {
+    const e=this.#entries.get(path);
+    if (!e || this.isDisposed) return null;
+    return {name:e.name,loaded:!!e.version,writable:e.canEdit!==false,busy:e.busy,lastSaved:e.lastSaved||null};
+  }
   get hasPendingSave() { return [...this.#entries.values()].some(entry => entry.busy); }
   release(path) {
     const entry = this.#entries.get(path);
@@ -202,6 +207,7 @@ export class NativeDrive {
       entry.version = meta.version;
       entry.modified = meta.modifiedTime;
       entry.savedSnapshot = JSON.stringify(content);
+      entry.lastSaved = new Date().toISOString();
       const model = this.#model(path,{...meta,capabilities:{canEdit:entry.canEdit}});
       this.fileChanged.emit({type:'save',oldValue:null,newValue:model});
       return model;

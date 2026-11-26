@@ -66,6 +66,18 @@ export class DriveSidebar extends Widget {
       body.append(h);const p=element('div',desc);p.style.color='var(--jp-ui-font-color2)';body.append(p);
     };
     section('Current notebook',s.current);
+    if (s.saveStatus) {
+      body.append(element('strong',s.notebookName));
+      const indicator=element('div',s.saveStatus.text);
+      indicator.dataset.saveState=s.saveStatus.kind;
+      indicator.setAttribute('aria-live','polite');
+      indicator.style.fontWeight='600';
+      indicator.style.color=s.saveStatus.kind==='failed'?'var(--jp-error-color1)':
+        ['dirty','unavailable'].includes(s.saveStatus.kind)?'var(--jp-warn-color1)':
+        s.saveStatus.kind==='saved'?'var(--jp-success-color1)':'var(--jp-ui-font-color1)';
+      body.append(indicator);
+      if(s.saveStatus.at)body.append(element('div','Last acknowledged upload: '+new Date(s.saveStatus.at).toLocaleTimeString()));
+    }
     body.append(button('Save notebook as new Drive copy','save-as',connected&&s.hasNotebook));
     body.append(button('Save local recovery copy','recover',s.hasNotebook));
     section('Authorized notebooks','Only files already authorized for this app. Select additional files with Google Picker.');

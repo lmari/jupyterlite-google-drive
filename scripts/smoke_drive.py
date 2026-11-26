@@ -234,10 +234,15 @@ def main():
                         dialog(a, "Opened native notebook")
                         cell = a.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
                         expect(cell).to_have_text("6 * 7")
+                        command(a, "Show workspace")
+                        workspace=a.locator("#jupyterlite-google-drive-sidebar")
+                        save_state=workspace.locator("[data-save-state]")
                         cell.click()
+                        expect(save_state).to_have_attribute("data-save-state","loaded",timeout=30000)
                         a.keyboard.press("Control+a")
                         a.keyboard.insert_text("7 * 8")
                         expect(cell).to_have_text("7 * 8")
+                        expect(save_state).to_have_attribute("data-save-state","dirty")
                         a.keyboard.press("Control+s")
                         for _ in range(100):
                             if fake.writes >= 2:
@@ -245,6 +250,7 @@ def main():
                             a.wait_for_timeout(200)
                         assert fake.writes >= 2, "Native save did not reach Drive"
                         assert "".join(fake.notebook["cells"][1]["source"]).strip() == "7 * 8"
+                        expect(save_state).to_have_attribute("data-save-state","saved",timeout=30000)
                         print("Native Ctrl+S persisted the code cell.")
                         # Exercise the real Pyodide kernel, not just the editor.
                         cell.click()
@@ -289,16 +295,19 @@ def main():
                         a.keyboard.press("Control+s")
                         wait_for(a, lambda: fake.pending_write is not None,
                                  "Manual save did not start")
+                        expect(save_state).to_have_attribute("data-save-state","saving",timeout=30000)
                         edit_cell(a, cell, "9 * 8")
                         fake.finish_pending_write()
                         assert source(fake) == "8 * 8"
                         expect(cell).to_have_text("9 * 8")
+                        expect(save_state).to_have_attribute("data-save-state","dirty",timeout=30000)
                         writes_before_auto = fake.writes
                         # No Ctrl+S here. Exercise the real configured JupyterLab
                         # autosave timer (normally 120 s), not a direct API call.
                         wait_for(a, lambda: source(fake) == "9 * 8",
                                  "Autosave did not persist the edit made during upload", seconds=180)
                         assert fake.writes > writes_before_auto
+                        expect(save_state).to_have_attribute("data-save-state","saved",timeout=30000)
                         print("Native autosave preserved and persisted an edit made during a pending save.")
                         a.wait_for_timeout(1000)
                         # Independent browser reopens the automatically saved version.
@@ -318,6 +327,7 @@ def main():
                         modal.get_by_role("button", name="Close", exact=True).click()
                         expect(modal).to_be_hidden()
                         assert source(fake) == "9 * 8"
+                        expect(save_state).to_have_attribute("data-save-state","failed",timeout=30000)
                         # Recovery copies live editor contents to the default local drive.
                         fake.unavailable = True
                         cell.click()
@@ -325,6 +335,7 @@ def main():
                         dialog(a, "Local recovery copy saved")
                         recovered = a.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
                         expect(recovered).to_have_text("9 * 9")
+                        expect(save_state).to_have_attribute("data-save-state","local",timeout=30000)
                         assert source(fake) == "9 * 8"
                         fake.unavailable = False
                         print("Local recovery preserved unsaved edits during a simulated Drive outage.")
