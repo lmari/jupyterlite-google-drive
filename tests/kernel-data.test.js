@@ -10,7 +10,7 @@ test('uses a flat safe path and preserves binary bytes',()=>{
   assert.match(code,/path.open\("xb"\)/);
   assert.match(code,/AP\+AQQ==/);
 });
-test('transfers to an idle Python kernel without history or token',async()=>{
+test('transfers to an idle Python kernel requesting no history and without token',async()=>{
   let request;
   const kernel={name:'python',status:'idle',requestExecute:(options)=>{
     request=options;return {done:Promise.resolve({content:{status:'ok'}})};
@@ -22,7 +22,11 @@ test('transfers to an idle Python kernel without history or token',async()=>{
   await assert.rejects(transferData({...kernel,status:'busy'},'x',Uint8Array.of()),/idle/);
   await assert.rejects(transferData({...kernel,name:'javascript'},'x',Uint8Array.of()),/Pyodide/);
 });
-test('reports collision without overwriting existing kernel file',async()=>{
-  const kernel={name:'python',status:'idle',requestExecute:()=>({done:Promise.resolve({content:{status:'error',ename:'FileExistsError'}})})};
-  await assert.rejects(transferData(kernel,'x',Uint8Array.of()),/already exists/);
+test('recognizes standard and actual Pyodide exception names for collision',async()=>{
+  for (const ename of ['FileExistsError', "<class 'FileExistsError'>", "<class 'builtins.FileExistsError'>"]) {
+    const kernel={name:'python',status:'idle',requestExecute:()=>({done:Promise.resolve({content:{status:'error',ename}})})};
+    await assert.rejects(transferData(kernel,'x',Uint8Array.of()),/already exists/);
+  }
+  const kernel={name:'python',status:'idle',requestExecute:()=>({done:Promise.resolve({content:{status:'error',ename:"<class 'PermissionError'>"}})})};
+  await assert.rejects(transferData(kernel,'x',Uint8Array.of()),/could not create/);
 });

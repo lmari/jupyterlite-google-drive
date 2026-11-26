@@ -16,7 +16,7 @@ with open("/tmp/jupyterlite-drive/dati.csv", newline="") as f:
     rows = list(csv.DictReader(f))
 ```
 
-This first step is a read-only snapshot of Drive, not a mounted folder, not synchronized, and not persisted across kernel restart or browser refresh. Repeat import on another device. Existing temporary files are never silently overwritten; delete or rename them explicitly in Python to import again. 5 MiB per file; Google-native documents (Sheets, Docs, etc.), folders and notebooks are excluded. Export a Sheet as CSV first. No additional OAuth scope, no token in the Python kernel, no notebook cells inserted. Import runs a fixed Python file-writing routine after confirmation; use only trusted kernels and data. Browser integration tests must pass before publishing.
+This first step is a read-only snapshot of Drive, not a mounted folder, not synchronized, and not persisted across kernel restart or browser refresh. Repeat import on another device. Existing temporary files are never silently overwritten; delete or rename them explicitly in Python to import again. 5 MiB per file; Google-native documents (Sheets, Docs, etc.), folders and notebooks are excluded. Export a Sheet as CSV first. No additional OAuth scope, no token in the Python kernel, no notebook cells inserted. Import runs a fixed Python file-writing routine after confirmation. The request asks the kernel not to store execution history, but Pyodide 0.8.7 internally runs cells with store_history=True, so the encoded data may remain in the kernel's input history until restart. Use only trusted kernels and non-sensitive data. Browser integration tests must pass before publishing.
 
 ## Experimental native mount
 

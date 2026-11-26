@@ -13,3 +13,7 @@ Node tests cover bytes, path sanitization, size guards, version checks, kernel s
 ## Later increments
 
 Investigate exposing an authorized data tree via Contents.IDrive and DriveFS, including kernel path handling, service worker/SharedArrayBuffer behavior and cross-device reauthorization. Do not equate this explicit temporary snapshot with a remote filesystem. Consider user-selected data dependencies and optional upload of generated files as distinct operations; no automatic remote writes of data until conflict semantics are designed.
+
+## Compatibility with Pyodide 0.8.7
+
+Run 45887742854 failed on the duplicate-file message after the first import succeeded. The upstream interpreter serializes exception types using str(etype), not __name__, so recognize both FileExistsError and its Python class representation. The browser test changes the fake remote CSV before retrying and verifies the first local snapshot is preserved. Pyodide also internally calls run_cell with store_history=True despite the execute request asking for no history; encoded data may remain in kernel history until restart. Do not use this prototype for sensitive data. References: https://github.com/jupyterlite/pyodide-kernel/blob/v0.8.7/packages/pyodide-kernel/py/pyodide-kernel/pyodide_kernel/interpreter.py and kernel.py in the same directory.

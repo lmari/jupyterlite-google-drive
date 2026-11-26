@@ -44,7 +44,9 @@ export async function transferData(kernel,name,bytes) {
   });
   const reply = await future.done;
   if (reply.content.status !== 'ok') {
-    throw new Error(reply.content.ename === 'FileExistsError'
+    // Pyodide 0.8.7 uses str(etype), e.g. "<class 'FileExistsError'>".
+    const collision = ['FileExistsError', "<class 'FileExistsError'>", "<class 'builtins.FileExistsError'>"].includes(reply.content.ename);
+    throw new Error(collision
       ? 'A temporary file with this name already exists. Delete or rename it in Python before importing again.'
       : 'The Python kernel could not create the temporary data file.');
   }
