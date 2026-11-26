@@ -1,10 +1,10 @@
 # jupyterlite-google-drive
 
-Experimental browser-only JupyterLab extension for JupyterLite. Version 0.5.0-alpha.2. No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
+Experimental browser-only JupyterLab extension for JupyterLite. Version 0.5.0-alpha.3. No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
 
 ## Status
 
-Experimental, not intended for sensitive files or production. The project owner has successfully connected a real Google account and reported the early native editor workflow working. The latest validated release (0.5 alpha 1) passed [42 unit tests and end-to-end browser tests](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45898817354), including live Python execution, both filesystem transports, notebook autosave and conflict recovery, binary export, same-account renewal and fresh-browser dependency restoration. CI uses real JupyterLite/Pyodide but mocked Google services. Full acceptance on GitHub Pages with real Google accounts remains outstanding.
+Experimental, not intended for sensitive files or production. The project owner has successfully connected a real Google account and reported the early native editor workflow working. The latest validated release (0.5 alpha 2) passed [45 unit tests and end-to-end browser tests](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45902799846), including live Python execution, both filesystem transports, notebook autosave and conflict recovery, binary export, same-account renewal and fresh-browser dependency restoration. CI uses real JupyterLite/Pyodide but mocked Google services. Full acceptance on GitHub Pages with real Google accounts remains outstanding.
 
 [Open the published experimental demo](https://lmari.github.io/jupyterlite-google-drive/lab/index.html). See [Google Cloud setup](docs/google-cloud.md) for running your own deployment.
 
@@ -46,6 +46,12 @@ with open("/tmp/jupyterlite-drive/dati.csv", newline="") as f:
 ```
 
 This first step is a read-only snapshot of Drive, not a mounted folder, not synchronized, and not persisted across kernel restart or browser refresh. Repeat import on another device. Existing temporary files are never silently overwritten; delete or rename them explicitly in Python to import again. 5 MiB per file; Google-native documents (Sheets, Docs, etc.), folders and notebooks are excluded. Export a Sheet as CSV first. No additional OAuth scope, no token in the Python kernel, no notebook cells inserted. Import runs a fixed Python file-writing routine after confirmation. The request asks the kernel not to store execution history, but Pyodide 0.8.7 internally runs cells with store_history=True, so the encoded data may remain in the kernel's input history until restart. Use only trusted kernels and non-sensitive data. Browser integration tests must pass before publishing.
+
+## Recovery without Google access
+
+Use **Download notebook recovery file** to download the current live notebook as an .ipynb, including unsaved edits. Use **Download Python output locally** to download staged binary or text output. Both work without a valid Google token and do not write to Drive. Save local recovery copy remains available for a browser-storage copy. Downloads do not mark files as saved or remove staged output. A browser leave-page warning is requested if a native editor is dirty, an upload is pending or temporary outputs exist. Browsers can suppress this warning; it is not an automatic backup and cannot protect against crashes. Export or download work before reloading.
+
+See [real-account acceptance checklist](docs/acceptance.md) before classroom use.
 
 ## Notebook persistence modes
 

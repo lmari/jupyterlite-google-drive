@@ -101,6 +101,15 @@ def main():
                         workspace.get_by_role("button",name="Refresh notebook list").click()
                         dialog(page,"Drive request failed (401)")
                         expect(workspace.get_by_role("status")).to_have_text("Authorization expired")
+                        assert page.evaluate("!window.dispatchEvent(new Event('beforeunload',{cancelable:true}))")
+                        with page.expect_download() as downloaded:
+                            command(page,"Download Python output locally")
+                            dialog(page,"Download Python output?")
+                        recovery=downloaded.value
+                        assert recovery.suggested_filename=="result.bin"
+                        assert recovery.path().read_bytes()==bytes([0,255,128,65])
+                        assert fake.created_data == [("result.bin",bytes([0,255,128,65]))]
+                        print("Downloaded exact staged output bytes while authorization expired.")
                         page.evaluate("window.__driveAuthToken = 'other-token'")
                         command(page,"Renew authorization")
                         dialog(page,"Different Google account selected")

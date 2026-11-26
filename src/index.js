@@ -9,6 +9,7 @@ import {NativeDrive} from './native-drive.js';
 import {dataPath, transferData} from './kernel-data.js';
 import {DriveSidebar} from './sidebar.js';
 import {describeSave} from './save-status.js';
+import {needsLeaveWarning,notebookBackupBytes,downloadBytes} from './recovery.js';
 import {dependencyKey,validateDependencies,addDependency,removeDependency,dependencyStatus} from './dependencies.js';
 
 const plugin = {
@@ -28,6 +29,16 @@ const plugin = {
     contents.addDrive(native);
     const nativePanels = new Set();
     const saveFailures = new WeakMap();
+    // Best-effort browser warning, not a backup.
+    globalThis.addEventListener('beforeunload',event=>{
+      if(needsLeaveWarning({
+        dirtyNative:[...nativePanels].some(p=>!p.isDisposed&&p.context.model.dirty),
+        pendingSave:native.hasPendingSave,temporaryOutputs:native.hasOutputs
+      })) {
+        event.preventDefault();
+        event.returnValue='';
+      }
+    });
     const requireClosed = () => {
       if (nativePanels.size || native.hasPendingSave) throw new Error('Close all experimental Google Drive notebooks before switching accounts or disconnecting. To keep them open, use Renew authorization. Export unsaved work first.');
     };
@@ -296,6 +307,21 @@ const plugin = {
       const paths=await native.restoreDependencies(value);
       await tell('Google Drive','Restored notebook data dependencies: '+paths.map(p=>'/drive/'+p).join(', '));
     });
+    const downloadNotebook=add('download-notebook','Google Drive: Download notebook recovery file',async()=>{
+      const panel=current(); await panel.context.ready;
+      if(panel.isDisposed)throw new Error('Notebook closed.');
+      const info=panel.context.path.startsWith(native.name+':')?native.saveInfo(contents.localPath(panel.context.path)):null;
+      const name=notebookName(info?.name||panel.context.path.split('/').pop());
+      downloadBytes(name,notebookBackupBytes(panel.context.model.toJSON()),'application/x-ipynb+json');
+    });
+    const downloadOutput=add('download-output','Google Drive: Download Python output locally',async()=>{
+      const paths=native.listOutputs();
+      if(!paths.length)throw new Error('No temporary output files to download.');
+      const result=await InputDialog.getItem({title:'Download Python output?',label:'Choose a temporary file to download to your computer. No Google connection is required.',items:paths,editable:false,okLabel:'Download'});
+      if(!result.button.accept)return;
+      const {name,bytes}=native.outputSnapshot(result.value);
+      downloadBytes(name,bytes);
+    });
     const exportData = add('export-data', 'Google Drive: Export Python output as new file', async () => {
       const paths = native.listOutputs();
       if (!paths.length) throw new Error('No output files. In a native notebook with filesystem synchronization, write a file under /drive/output/ first.');
@@ -339,7 +365,7 @@ const plugin = {
     native.fileChanged.connect(refreshSidebar);
     const showPanel='jupyterlite-google-drive:show-panel';
     app.commands.addCommand(showPanel,{label:'Google Drive: Show workspace',execute:()=>app.shell.activateById(sidebar.id)});
-    menu.fileMenu.addGroup([{command:showPanel},connect, renew, open, browse, nativeOpen, save, saveAs, recover, importData, mountData, rememberData, addDataDependency, removeDataDependency, restoreData, exportData, disconnect], 80);
+    menu.fileMenu.addGroup([{command:showPanel},connect, renew, open, browse, nativeOpen, save, saveAs, recover, downloadNotebook, importData, mountData, rememberData, addDataDependency, removeDataDependency, restoreData, exportData, downloadOutput, disconnect], 80);
     // Load external scripts only if configured; connect itself remains a user gesture.
     void auth.prepare().then(() => {prepared = true;refreshSidebar();}).catch(e => {preparationError = String(e.message || e);refreshSidebar();});
   }
