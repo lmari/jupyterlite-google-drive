@@ -9,3 +9,7 @@ The adapter exposes observed busy state, original name, writable/loaded state an
 ## Alpha 3: renew without changing account
 
 Use Drive v3 about.get with fields=user(permissionId), supported under the existing drive.file scope. Verify candidate token before publishing it. Permission ID is kept only in memory. Same-account renewal preserves notebook baselines, mounts, local links and outputs. Missing identity, failed verification or different account rejects the candidate. A 401 invalidates only the exact rejected token; a late response from an earlier token cannot invalidate a new one. No automatic retries of failed writes. Reference: https://developers.google.com/workspace/drive/api/reference/rest/v3/about/get. Real Google account acceptance required.
+
+## Alpha 5.1: notebook dependency manifest
+
+Use a versioned metadata key jupyterlite_google_drive. Only explicit user action records the current session mount list; only explicit restore triggers metadata requests. Reject malformed manifests, traversal, arbitrary URLs, duplicate aliases and more than 20 dependencies. Preflight each ID and metadata, then atomically register aliases; do not overwrite an existing different ID. No authorization grants, data bytes, credentials or account IDs in metadata. File IDs are visible to notebook readers; references resolve current data rather than pinned versions. Fresh browser context test verifies saved manifest and restored Python reads on both transports. Shared mount namespace and Picker reauthorization for inaccessible files remain limitations.

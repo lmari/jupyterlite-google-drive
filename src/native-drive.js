@@ -2,6 +2,7 @@ import {Signal} from '@lumino/signaling';
 import {notebookName, validateNotebook, validateDataMetadata, maxDataBytes} from './drive-api.js';
 
 import {dataPath, toBase64} from './kernel-data.js';
+import {makeManifest,validateDependencies} from './dependencies.js';
 
 const epoch = '1970-01-01T00:00:00.000Z';
 const unavailable = () => Object.assign(new Error('Google Drive: this operation is not supported in the experimental notebook drive.'), {response:{status:403}});
@@ -96,6 +97,30 @@ export class NativeDrive {
     return this.#dataModel(path,result.meta,result.bytes);
   }
   listData() { return [...this.#data.keys()]; }
+  dependencyManifest() {
+    return makeManifest([...this.#data].map(([path,e])=>({path,file_id:e.id})));
+  }
+  async restoreDependencies(value) {
+    const deps=validateDependencies(value);
+    const generation=this.#generation;
+    if(this.isDisposed)throw new Error('Drive disposed.');
+    // Preflight every reference before mutating the shared mount table.
+    const planned=[];
+    for(const d of deps) {
+      const current=this.#data.get(d.path);
+      if(current && current.id!==d.file_id)throw new Error('Data alias collision: '+d.path);
+      const meta=validateDataMetadata(await this.api.metadata(d.file_id));
+      if(meta.id!==d.file_id)throw new Error('Drive returned a different file ID.');
+      planned.push({d,meta});
+    }
+    if(this.isDisposed||generation!==this.#generation)throw new Error('Google Drive authorization changed; retry.');
+    for(const {d} of planned) {
+      const current=this.#data.get(d.path);
+      if(current && current.id!==d.file_id)throw new Error('Data alias collision: '+d.path);
+    }
+    for(const {d,meta} of planned)this.#data.set(d.path,{id:d.file_id,meta});
+    return deps.map(d=>d.path);
+  }
   get hasOutputs() { return this.#outputs.size > 0; }
   listOutputs() { return [...this.#outputs.keys()]; }
   outputSnapshot(path) {

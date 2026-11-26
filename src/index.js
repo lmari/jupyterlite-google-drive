@@ -9,6 +9,7 @@ import {NativeDrive} from './native-drive.js';
 import {dataPath, transferData} from './kernel-data.js';
 import {DriveSidebar} from './sidebar.js';
 import {describeSave} from './save-status.js';
+import {dependencyKey,validateDependencies} from './dependencies.js';
 
 const plugin = {
   id: 'jupyterlite-google-drive:plugin', autoStart: true,
@@ -213,6 +214,41 @@ const plugin = {
       const path = native.mountData(meta);
       await tell('Google Drive', `Mounted /drive/${path}. In a native notebook with filesystem synchronization enabled, use open("/drive/${path}", "rb"). Mounts expire on account switch, disconnect or refresh; same-account renewal preserves them.`);
     });
+    const dependencyPanel=async()=>{
+      const panel=current(); await panel.context.ready;
+      if(panel.isDisposed||!panel.context.path.startsWith(native.name+':'))throw new Error('Open a native Google Drive notebook first.');
+      return panel;
+    };
+    const rememberData=add('remember-data','Google Drive: Remember mounted data in notebook',async()=>{
+      const panel=await dependencyPanel();
+      if(native.saveInfo(contents.localPath(panel.context.path))?.writable===false)throw new Error('Notebook is read-only.');
+      const model=panel.context.model;
+      const previous=model.getMetadata(dependencyKey);
+      const next=native.dependencyManifest();
+      const names=next.dependencies.map(d=>'/drive/'+d.path).join(', ')||'(none)';
+      const answer=await showDialog({title:'Remember mounted data?',
+        body:'Replace this notebook’s dependency list with the current session’s mounted data: '+names+'. File IDs and aliases will be stored in notebook metadata and visible to anyone who can read the notebook. No credentials or file contents are stored. Save the notebook to persist the list.',
+        buttons:[Dialog.cancelButton(),Dialog.okButton({label:'Remember'})]});
+      if(!answer.button.accept)return;
+      if(panel.isDisposed||JSON.stringify(model.getMetadata(dependencyKey))!==JSON.stringify(previous))throw new Error('Notebook dependencies changed; retry.');
+      model.setMetadata(dependencyKey,next);
+      model.dirty=true;
+      await tell('Google Drive','Dependencies recorded in notebook metadata. Save the notebook to persist them.');
+    });
+    const restoreData=add('restore-data','Google Drive: Restore notebook data dependencies',async()=>{
+      const panel=await dependencyPanel();
+      const model=panel.context.model;
+      const value=model.getMetadata(dependencyKey);
+      const deps=validateDependencies(value);
+      if(!deps.length)throw new Error('This notebook has no recorded Google Drive dependencies.');
+      const answer=await showDialog({title:'Restore notebook data dependencies?',
+        body:'Mount these declared data paths: '+deps.map(d=>'/drive/'+d.path).join(', ')+'. Google Drive checks access for each file. No extra permissions are requested; if a file is inaccessible, select it separately with Google Picker and retry. Existing aliases will not be overwritten.',
+        buttons:[Dialog.cancelButton(),Dialog.okButton({label:'Restore'})]});
+      if(!answer.button.accept)return;
+      if(panel.isDisposed||JSON.stringify(model.getMetadata(dependencyKey))!==JSON.stringify(value))throw new Error('Notebook dependencies changed; retry.');
+      const paths=await native.restoreDependencies(value);
+      await tell('Google Drive','Restored notebook data dependencies: '+paths.map(p=>'/drive/'+p).join(', '));
+    });
     const exportData = add('export-data', 'Google Drive: Export Python output as new file', async () => {
       const paths = native.listOutputs();
       if (!paths.length) throw new Error('No output files. In a native notebook with filesystem synchronization, write a file under /drive/output/ first.');
@@ -241,7 +277,9 @@ const plugin = {
       const isNative=hasNotebook && panel.context.path.startsWith(native.name+':');
       const info=isNative?native.saveInfo(contents.localPath(panel.context.path)):null;
       const saveStatus=hasNotebook?describeSave({isNative,linked:links.has(panel),dirty:panel.context.model.dirty,info,failed:saveFailures.has(panel),auth:auth.status}):null;
-      return {prepared,preparationError,busy,auth:auth.status,hasAccount:auth.hasAccount,hasNotebook,isNative,saveStatus,
+      let dependencies=[],dependencyError='';
+      if(isNative)try{dependencies=validateDependencies(panel.context.model.getMetadata(dependencyKey)).map(d=>d.path);}catch(e){dependencyError=String(e.message||e);}
+      return {prepared,preparationError,busy,auth:auth.status,hasAccount:auth.hasAccount,hasNotebook,isNative,saveStatus,dependencies,dependencyError,
         notebookName:hasNotebook?(info?.name || panel.context.path.split('/').pop()):'',
         current:!hasNotebook?'No active notebook':isNative?'Remote notebook — standard Save and autosave write to Drive':
           links.has(panel)?'Local copy — explicit Save to original writes to Drive':'Local notebook — browser storage',
@@ -254,7 +292,7 @@ const plugin = {
     native.fileChanged.connect(refreshSidebar);
     const showPanel='jupyterlite-google-drive:show-panel';
     app.commands.addCommand(showPanel,{label:'Google Drive: Show workspace',execute:()=>app.shell.activateById(sidebar.id)});
-    menu.fileMenu.addGroup([{command:showPanel},connect, renew, open, browse, nativeOpen, save, saveAs, recover, importData, mountData, exportData, disconnect], 80);
+    menu.fileMenu.addGroup([{command:showPanel},connect, renew, open, browse, nativeOpen, save, saveAs, recover, importData, mountData, rememberData, restoreData, exportData, disconnect], 80);
     // Load external scripts only if configured; connect itself remains a user gesture.
     void auth.prepare().then(() => {prepared = true;refreshSidebar();}).catch(e => {preparationError = String(e.message || e);refreshSidebar();});
   }

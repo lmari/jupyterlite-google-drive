@@ -101,6 +101,14 @@ export class DriveSidebar extends Widget {
     body.append(button('Import temporary data copy…','import-data',connected&&s.hasNotebook));
     if(!s.data.length)body.append(element('div','No mounted data.'));
     for(const path of s.data)body.append(element('code','/drive/'+path));
+    if(s.isNative) {
+      section('Notebook dependencies','Saved in notebook metadata. Restore explicitly after opening on another device.');
+      if(s.dependencyError)body.append(element('div',s.dependencyError));
+      else if(!s.dependencies.length)body.append(element('div','No recorded dependencies.'));
+      for(const path of s.dependencies)body.append(element('div','Recorded: /drive/'+path));
+      body.append(button('Remember mounted data','remember-data',connected));
+      body.append(button('Restore notebook data dependencies','restore-data',connected&&!s.dependencyError&&s.dependencies.length>0));
+    }
     section('Python output','Temporary files under /drive/output/. Export before switching accounts or reloading.');
     if(!s.outputs.length)body.append(element('div','No output files.'));
     for(const path of s.outputs)body.append(element('code','/drive/'+path));

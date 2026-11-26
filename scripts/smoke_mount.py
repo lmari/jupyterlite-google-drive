@@ -115,9 +115,39 @@ def main():
                         edit_cell(page,cell,'sum(int(r["x"]) for r in csv.DictReader(open("/drive/data/dati.csv")))')
                         page.keyboard.press("Control+Enter")
                         expect(output).to_have_text("50",timeout=60000)
+                        command(page,"Remember mounted data in notebook")
+                        dialog(page,"Remember mounted data?")
+                        dialog(page,"Dependencies recorded in notebook metadata.")
+                        expect(workspace.get_by_text("Recorded: /drive/data/dati.csv",exact=True)).to_be_visible()
                         page.keyboard.press("Control+s")
                         wait_for(page,lambda:fake.writes>0,"Save after renewal did not reach Drive")
+                        assert fake.notebook["metadata"]["jupyterlite_google_drive"] == {
+                            "version":1,"dependencies":[{"path":"data/dati.csv","file_id":"data-file"}]}
+                        expect(workspace.locator("[data-save-state]")).to_have_attribute("data-save-state","saved",timeout=30000)
                         print("Same-account authorization renewed with notebook and data preserved; wrong account rejected.")
+                        ctx.close()
+                        # Independent browser context, no mounted state from the first.
+                        fake.expire_original_token=False
+                        ctx,page=start(browser,url,fake,service_workers="allow" if service_worker else "block")
+                        if service_worker:
+                            page.wait_for_function("navigator.serviceWorker.controller !== null",timeout=60000)
+                        command(page,"Open native notebook (experimental)")
+                        dialog(page,"Experimental remote editor")
+                        dialog(page,"Opened native notebook")
+                        command(page,"Show workspace")
+                        workspace=page.locator("#jupyterlite-google-drive-sidebar")
+                        expect(workspace.get_by_text("Recorded: /drive/data/dati.csv",exact=True)).to_be_visible()
+                        expect(workspace.get_by_text("No mounted data.",exact=True)).to_be_visible()
+                        command(page,"Restore notebook data dependencies")
+                        dialog(page,"Restore notebook data dependencies?")
+                        dialog(page,"Restored notebook data dependencies:")
+                        expect(workspace.get_by_text("/drive/data/dati.csv",exact=True)).to_be_visible()
+                        cell=page.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
+                        edit_cell(page,cell,'import csv; sum(int(r["x"]) for r in csv.DictReader(open("/drive/data/dati.csv")))')
+                        page.keyboard.press("Control+Enter")
+                        output=page.locator(".jp-Notebook:visible .jp-CodeCell .jp-OutputArea-output").first
+                        expect(output).to_have_text("50",timeout=180000)
+                        print("Fresh browser restored recorded notebook data dependencies and executed Python.")
                         ctx.close()
                     except Exception:
                         if page and not page.is_closed():

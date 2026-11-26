@@ -1,6 +1,6 @@
 # jupyterlite-google-drive
 
-Experimental browser-only JupyterLab extension for JupyterLite. Version 0.4.0-alpha.3. No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
+Experimental browser-only JupyterLab extension for JupyterLite. Version 0.5.0-alpha.1. No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
 
 ## Status
 
@@ -13,6 +13,10 @@ Open File > Google Drive: Show workspace or the Drive tab in the left sidebar. T
 ### Renewal without closing notebooks
 
 Use File > Google Drive: Renew authorization (also in the sidebar). Choose the original Google account. The candidate token is checked against the current Drive permission ID before use; a different account is rejected without changing the workspace. A 401 marks authorization expired; retry failed saves explicitly after renewal. No additional OAuth scope, no refresh token, no automatic remote retry. This is still experimental until real Google account verification.
+
+## Notebook data dependencies (0.5 alpha)
+
+In a native remote notebook, mount the needed input files, then use **Remember mounted data in notebook** and save. This replaces the dependency list with the session's current mounted files, recording only aliases and Drive file IDs in notebook metadata. IDs are visible to anyone with access to the notebook; no tokens or file contents are included. In a new browser session open the notebook and explicitly choose **Restore notebook data dependencies**. Drive checks current access for every reference; no additional scopes or automatic grants. A missing file or alias collision aborts the entire restore. If a file is not authorized, select it through Picker and retry. Paths remain stable even after a remote rename. This preserves references to live inputs, not immutable dataset versions; the actual contents may change. The alias namespace remains shared among native notebooks within a browser session. To clear recorded dependencies, remember an empty mount list in a fresh session. Temporary output files are not included.
 
 ## Experimental Python output export
 
