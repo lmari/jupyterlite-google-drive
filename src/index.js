@@ -3,6 +3,7 @@ import {PageConfig} from '@jupyterlab/coreutils';
 import {IDocumentManager} from '@jupyterlab/docmanager';
 import {IMainMenu} from '@jupyterlab/mainmenu';
 import {INotebookTracker} from '@jupyterlab/notebook';
+import {Menu} from '@lumino/widgets';
 import {GoogleAuth} from './auth.js';
 import {DriveAPI, notebookName} from './drive-api.js';
 import {NativeDrive} from './native-drive.js';
@@ -64,7 +65,7 @@ const plugin = {
     };
     const add = (name, label, fn) => {
       const id = 'jupyterlite-google-drive:' + name;
-      app.commands.addCommand(id, {label, execute: run(fn)});
+      app.commands.addCommand(id, {label:args=>args.inDriveMenu?label.replace(/^Google Drive: /,''):label, execute: run(fn)});
       return {command: id};
     };
     const connect = add('connect', 'Google Drive: Connect', async () => {
@@ -364,8 +365,34 @@ const plugin = {
     tracker.currentChanged.connect(refreshSidebar);
     native.fileChanged.connect(refreshSidebar);
     const showPanel='jupyterlite-google-drive:show-panel';
-    app.commands.addCommand(showPanel,{label:'Google Drive: Show workspace',execute:()=>app.shell.activateById(sidebar.id)});
-    menu.fileMenu.addGroup([{command:showPanel},connect, renew, open, browse, nativeOpen, save, saveAs, recover, downloadNotebook, importData, mountData, rememberData, addDataDependency, removeDataDependency, restoreData, exportData, downloadOutput, disconnect], 80);
+    app.commands.addCommand(showPanel,{label:args=>args.inDriveMenu?'Show workspace':'Google Drive: Show workspace',execute:()=>app.shell.activateById(sidebar.id)});
+    // Two compact File entries. Keep the ordinary native workflow separate
+    // from account switching, legacy local-copy and recovery operations.
+    const buildMenu=(id,title,groups)=>{
+      const submenu=new Menu({commands:app.commands});
+      submenu.id=id;
+      submenu.title.label=title;
+      groups.forEach((group,i)=>{
+        if(i)submenu.addItem({type:'separator'});
+        group.forEach(item=>submenu.addItem({...item,args:{inDriveMenu:true}}));
+      });
+      return submenu;
+    };
+    const driveMenu=buildMenu('jupyterlite-google-drive-menu','Google Drive',[
+      [{command:showPanel},connect,renew],
+      [nativeOpen,saveAs],
+      [mountData,addDataDependency,restoreData,exportData]
+    ]);
+    const advancedMenu=buildMenu('jupyterlite-google-drive-advanced-menu','Google Drive (advanced)',[
+      [open,browse,save],
+      [removeDataDependency,rememberData,importData],
+      [recover,downloadNotebook,downloadOutput],
+      [disconnect]
+    ]);
+    menu.fileMenu.addGroup([
+      {type:'submenu',submenu:driveMenu},
+      {type:'submenu',submenu:advancedMenu}
+    ],80);
     // Load external scripts only if configured; connect itself remains a user gesture.
     void auth.prepare().then(() => {prepared = true;refreshSidebar();}).catch(e => {preparationError = String(e.message || e);refreshSidebar();});
   }

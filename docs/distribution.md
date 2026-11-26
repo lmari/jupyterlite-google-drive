@@ -10,7 +10,7 @@ After a successful CI run, download the `jupyterlite-google-drive-wheel` artifac
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install jupyterlite-core==0.8.7 jupyterlite-pyodide-kernel==0.8.7
-python -m pip install ./jupyterlite_google_drive-0.6.0b1-py3-none-any.whl
+python -m pip install ./jupyterlite_google_drive-0.6.0b2-py3-none-any.whl
 ```
 
 On Windows activate with `.venv\Scripts\activate`. The actual wheel filename follows the version in the artifact. You do not need Node.js or npm to install a prebuilt wheel. Do not use `%pip install` in a running notebook: installation is a site-build operation.

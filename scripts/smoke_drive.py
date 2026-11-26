@@ -147,8 +147,16 @@ def edit_cell(page, cell, text):
     expect(cell).to_have_text(text)
 
 def command(page, label):
+    advanced = ["Open notebook","Browse authorized notebooks","Save to original","Remove recorded data dependency","Remember mounted data in notebook","Import data into Python","Save local recovery copy","Download notebook recovery file","Download Python output locally","Disconnect"]
+    is_advanced = label in advanced
+    title = "Google Drive (advanced)" if is_advanced else "Google Drive"
+    menu_id = "jupyterlite-google-drive-advanced-menu" if is_advanced else "jupyterlite-google-drive-menu"
     page.locator(".lm-MenuBar-item").filter(has_text="File").first.click()
-    page.get_by_text("Google Drive: " + label, exact=True).click()
+    file_menu=page.locator(".lm-Menu:visible").first
+    file_menu.get_by_text(title,exact=True).hover()
+    submenu=page.locator("#"+menu_id)
+    expect(submenu).to_be_visible(timeout=30000)
+    submenu.get_by_text(label,exact=True).click()
 
 def dialog(page, message):
     # Match the expected dialog, not a moving .last locator: the next
