@@ -9,7 +9,7 @@ import {NativeDrive} from './native-drive.js';
 import {dataPath, transferData} from './kernel-data.js';
 import {DriveSidebar} from './sidebar.js';
 import {describeSave} from './save-status.js';
-import {dependencyKey,validateDependencies} from './dependencies.js';
+import {dependencyKey,validateDependencies,addDependency,removeDependency,dependencyStatus} from './dependencies.js';
 
 const plugin = {
   id: 'jupyterlite-google-drive:plugin', autoStart: true,
@@ -235,6 +235,53 @@ const plugin = {
       model.dirty=true;
       await tell('Google Drive','Dependencies recorded in notebook metadata. Save the notebook to persist them.');
     });
+    const dependencyEditor=async()=>{
+      const panel=await dependencyPanel();
+      if(native.saveInfo(contents.localPath(panel.context.path))?.writable!==true)throw new Error('Notebook is not writable.');
+      const model=panel.context.model;
+      const previous=model.getMetadata(dependencyKey);
+      const baseline=JSON.stringify(previous);
+      const existing=validateDependencies(previous);
+      const commit=next=>{
+        if(panel.isDisposed||JSON.stringify(model.getMetadata(dependencyKey))!==baseline||
+            native.saveInfo(contents.localPath(panel.context.path))?.writable!==true)
+          throw new Error('Notebook or dependencies changed; retry.');
+        model.setMetadata(dependencyKey,next);
+        model.dirty=true;
+      };
+      return {previous,existing,commit};
+    };
+    const addDataDependency=add('add-dependency','Google Drive: Add selected data dependency',async()=>{
+      const {previous,existing,commit}=await dependencyEditor();
+      const mounted=native.listDataReferences();
+      const candidates=mounted.filter(d=>!existing.some(e=>e.path===d.path));
+      if(!candidates.length)throw new Error('No new mounted data aliases. Mount a file first, or remove a conflicting recorded dependency.');
+      const result=await InputDialog.getItem({
+        title:'Add data dependency?',
+        label:'Choose one mounted file. Its Drive ID and alias will be stored in this notebook and visible to its readers. Existing dependencies remain unchanged.',
+        items:candidates.map(d=>'/drive/'+d.path),editable:false,okLabel:'Add'
+      });
+      if(!result.button.accept)return;
+      const chosen=candidates.find(d=>'/drive/'+d.path===result.value);
+      if(!chosen||!native.listDataReferences().some(d=>d.path===chosen.path&&d.file_id===chosen.file_id))
+        throw new Error('Mounted file changed; retry.');
+      commit(addDependency(previous,chosen));
+      await tell('Google Drive','Dependency added. Save the notebook to persist it.');
+    });
+    const removeDataDependency=add('remove-dependency','Google Drive: Remove recorded data dependency',async()=>{
+      const {previous,existing,commit}=await dependencyEditor();
+      if(!existing.length)throw new Error('This notebook has no recorded data dependencies.');
+      const result=await InputDialog.getItem({
+        title:'Remove recorded dependency?',
+        label:'Remove one reference from this notebook only. The mounted data and the original Google Drive file are not deleted.',
+        items:existing.map(d=>'/drive/'+d.path),editable:false,okLabel:'Remove'
+      });
+      if(!result.button.accept)return;
+      const chosen=existing.find(d=>'/drive/'+d.path===result.value);
+      if(!chosen)throw new Error('Choose a recorded dependency.');
+      commit(removeDependency(previous,chosen.path));
+      await tell('Google Drive','Dependency removed from notebook metadata. Save the notebook to persist it.');
+    });
     const restoreData=add('restore-data','Google Drive: Restore notebook data dependencies',async()=>{
       const panel=await dependencyPanel();
       const model=panel.context.model;
@@ -278,8 +325,8 @@ const plugin = {
       const info=isNative?native.saveInfo(contents.localPath(panel.context.path)):null;
       const saveStatus=hasNotebook?describeSave({isNative,linked:links.has(panel),dirty:panel.context.model.dirty,info,failed:saveFailures.has(panel),auth:auth.status}):null;
       let dependencies=[],dependencyError='';
-      if(isNative)try{dependencies=validateDependencies(panel.context.model.getMetadata(dependencyKey)).map(d=>d.path);}catch(e){dependencyError=String(e.message||e);}
-      return {prepared,preparationError,busy,auth:auth.status,hasAccount:auth.hasAccount,hasNotebook,isNative,saveStatus,dependencies,dependencyError,
+      if(isNative)try{const mounted=native.listDataReferences();dependencies=validateDependencies(panel.context.model.getMetadata(dependencyKey)).map(d=>({path:d.path,status:dependencyStatus(d,mounted)}));}catch(e){dependencyError=String(e.message||e);}
+      return {prepared,preparationError,busy,auth:auth.status,hasAccount:auth.hasAccount,hasNotebook,isNative,saveStatus,dependencies,dependencyError,dependencyEditable:info?.writable===true,
         notebookName:hasNotebook?(info?.name || panel.context.path.split('/').pop()):'',
         current:!hasNotebook?'No active notebook':isNative?'Remote notebook — standard Save and autosave write to Drive':
           links.has(panel)?'Local copy — explicit Save to original writes to Drive':'Local notebook — browser storage',
@@ -292,7 +339,7 @@ const plugin = {
     native.fileChanged.connect(refreshSidebar);
     const showPanel='jupyterlite-google-drive:show-panel';
     app.commands.addCommand(showPanel,{label:'Google Drive: Show workspace',execute:()=>app.shell.activateById(sidebar.id)});
-    menu.fileMenu.addGroup([{command:showPanel},connect, renew, open, browse, nativeOpen, save, saveAs, recover, importData, mountData, rememberData, restoreData, exportData, disconnect], 80);
+    menu.fileMenu.addGroup([{command:showPanel},connect, renew, open, browse, nativeOpen, save, saveAs, recover, importData, mountData, rememberData, addDataDependency, removeDataDependency, restoreData, exportData, disconnect], 80);
     // Load external scripts only if configured; connect itself remains a user gesture.
     void auth.prepare().then(() => {prepared = true;refreshSidebar();}).catch(e => {preparationError = String(e.message || e);refreshSidebar();});
   }

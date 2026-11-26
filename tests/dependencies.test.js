@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {validateDependencies,makeManifest} from '../src/dependencies.js';
+import {validateDependencies,makeManifest,addDependency,removeDependency,dependencyStatus} from '../src/dependencies.js';
 import {NativeDrive} from '../src/native-drive.js';
 const dep={path:'data/dati.csv',file_id:'file-1'};
 const meta={id:'file-1',name:'renamed.csv',mimeType:'text/csv',version:'1',size:'4'};
@@ -30,4 +30,25 @@ test('reset invalidates in-flight restore',async()=>{
   const p=d.restoreDependencies(makeManifest([dep]));d.reset();finish(meta);
   await assert.rejects(p,/authorization changed/);
   assert.deepEqual(d.listData(),[]);
+});
+
+test('individual dependency selection preserves unrelated and currently unmounted references',()=>{
+  const existing=makeManifest([dep]);
+  const second={path:'data/other.csv',file_id:'file-2'};
+  assert.deepEqual(addDependency(existing,second),makeManifest([dep,second]));
+  assert.deepEqual(addDependency(existing,dep),existing);
+  assert.deepEqual(removeDependency(addDependency(existing,second),dep.path),makeManifest([second]));
+  assert.deepEqual(existing,makeManifest([dep]));
+});
+test('dependency selection refuses replacement of an existing alias with a different file',()=>{
+  const existing=makeManifest([dep]);
+  assert.throws(()=>addDependency(existing,{...dep,file_id:'other'}),/another file/);
+  assert.equal(dependencyStatus(dep,[]),'not-mounted');
+  assert.equal(dependencyStatus(dep,[dep]),'mounted');
+  assert.equal(dependencyStatus(dep,[{...dep,file_id:'other'}]),'collision');
+});
+test('adding one reference enforces manifest size and valid paths',()=>{
+  const full=makeManifest(Array.from({length:20},(_,i)=>({path:'data/file'+i+'.csv',file_id:'id-'+i})));
+  assert.throws(()=>addDependency(full,dep),/Unsupported/);
+  assert.throws(()=>addDependency(undefined,{path:'data/../bad',file_id:'id'}),/Invalid/);
 });

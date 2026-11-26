@@ -105,8 +105,16 @@ export class DriveSidebar extends Widget {
       section('Notebook dependencies','Saved in notebook metadata. Restore explicitly after opening on another device.');
       if(s.dependencyError)body.append(element('div',s.dependencyError));
       else if(!s.dependencies.length)body.append(element('div','No recorded dependencies.'));
-      for(const path of s.dependencies)body.append(element('div','Recorded: /drive/'+path));
-      body.append(button('Remember mounted data','remember-data',connected));
+      for(const d of s.dependencies){
+        body.append(element('div','Recorded: /drive/'+d.path));
+        const status=element('div',d.status==='mounted'?'Mounted':d.status==='collision'?'Alias refers to another file':'Not mounted');
+        status.style.color=d.status==='collision'?'var(--jp-error-color1)':'var(--jp-ui-font-color2)';
+        status.dataset.dependencyState=d.status;
+        body.append(status);
+      }
+      body.append(button('Add selected dependency…','add-dependency',connected&&s.dependencyEditable&&!s.dependencyError&&s.data.some(p=>!s.dependencies.some(d=>d.path===p))));
+      body.append(button('Remove recorded dependency…','remove-dependency',s.dependencyEditable&&!s.dependencyError&&s.dependencies.length>0));
+      body.append(button('Replace with all mounted data…','remember-data',connected&&s.dependencyEditable));
       body.append(button('Restore notebook data dependencies','restore-data',connected&&!s.dependencyError&&s.dependencies.length>0));
     }
     section('Python output','Temporary files under /drive/output/. Export before switching accounts or reloading.');

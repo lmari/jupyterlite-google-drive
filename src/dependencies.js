@@ -18,3 +18,20 @@ export function validateDependencies(value) {
 export function makeManifest(dependencies) {
   return {version:1,dependencies:validateDependencies({version:1,dependencies})};
 }
+
+export function addDependency(value, candidate) {
+  const existing=validateDependencies(value);
+  const [next]=validateDependencies(makeManifest([candidate]));
+  const previous=existing.find(d=>d.path===next.path);
+  if(previous && previous.file_id!==next.file_id)
+    throw new Error('Dependency alias already refers to another file. Remove the recorded dependency first.');
+  return makeManifest(previous?existing:[...existing,next]);
+}
+export function removeDependency(value,path) {
+  return makeManifest(validateDependencies(value).filter(d=>d.path!==path));
+}
+// Compare both ID and alias; a matching name alone does not mean restored.
+export function dependencyStatus(dependency,mounted) {
+  const current=mounted.find(d=>d.path===dependency.path);
+  return !current?'not-mounted':current.file_id===dependency.file_id?'mounted':'collision';
+}

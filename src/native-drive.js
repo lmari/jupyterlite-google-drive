@@ -97,8 +97,9 @@ export class NativeDrive {
     return this.#dataModel(path,result.meta,result.bytes);
   }
   listData() { return [...this.#data.keys()]; }
+  listDataReferences() { return [...this.#data].map(([path,e])=>({path,file_id:e.id})); }
   dependencyManifest() {
-    return makeManifest([...this.#data].map(([path,e])=>({path,file_id:e.id})));
+    return makeManifest(this.listDataReferences());
   }
   async restoreDependencies(value) {
     const deps=validateDependencies(value);
