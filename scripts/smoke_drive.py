@@ -49,6 +49,9 @@ class FakeDrive:
         self.notebook = json.loads((ROOT / "demo/notebooks/welcome.ipynb").read_text())
         self.notebook["cells"][1]["source"] = ["40 + 2"]
         self.writes = 0
+        self.hold_next_write = False
+        self.pending_write = None
+        self.unavailable = False
 
     def metadata(self):
         return {"id":"demo-file", "name":"remote.ipynb", "version":str(self.version),
@@ -63,11 +66,18 @@ class FakeDrive:
             route.fulfill(status=204, headers=cors)
             return
         assert req.headers.get("authorization") == "Bearer mock-token"
+        if self.unavailable:
+            route.fulfill(status=503, headers=cors, json={"error":"simulated outage"})
+            return
         if url.path == "/drive/v3/files" and req.method == "GET":
             value = {"files":[self.metadata(), {"id":"other","name":"ignore.csv"}]}
         elif url.path == "/drive/v3/files/demo-file" and req.method == "GET":
             value = self.notebook if parse_qs(url.query).get("alt") == ["media"] else self.metadata()
         elif url.path == "/upload/drive/v3/files/demo-file" and req.method == "PATCH":
+            if self.hold_next_write:
+                self.hold_next_write = False
+                self.pending_write = route
+                return
             self.notebook = json.loads(req.post_data)
             self.version += 1
             self.writes += 1
@@ -76,6 +86,32 @@ class FakeDrive:
             route.fulfill(status=404, headers=cors, json={"error":"unexpected request"})
             return
         route.fulfill(status=200, headers=cors, json=value)
+
+    def finish_pending_write(self):
+        route = self.pending_write
+        assert route is not None
+        self.pending_write = None
+        self.notebook = json.loads(route.request.post_data)
+        self.version += 1
+        self.writes += 1
+        route.fulfill(status=200, headers={"access-control-allow-origin":"*"}, json=self.metadata())
+
+def wait_for(page, predicate, message, seconds=30):
+    # Pump browser events while waiting for asynchronous writes.
+    for _ in range(seconds * 5):
+        if predicate():
+            return
+        page.wait_for_timeout(200)
+    assert predicate(), message
+
+def source(drive):
+    return "".join(drive.notebook["cells"][1]["source"]).strip()
+
+def edit_cell(page, cell, text):
+    cell.click()
+    page.keyboard.press("Control+a")
+    page.keyboard.insert_text(text)
+    expect(cell).to_have_text(text)
 
 def command(page, label):
     page.locator(".lm-MenuBar-item").filter(has_text="File").first.click()
@@ -203,6 +239,31 @@ def main():
                             raise AssertionError("Executed Python output did not persist on simulated Drive")
 
                         print("Pyodide executed the native notebook and its output persisted.")
+                        # Delay the next upload while the user continues editing.
+                        # The completed upload must contain the captured snapshot,
+                        # and the later edit must stay dirty for JupyterLab autosave.
+                        # Allow the preceding save's metadata/checkpoint to settle.
+                        a.wait_for_timeout(1000)
+                        fake.hold_next_write = True
+                        edit_cell(a, cell, "8 * 8")
+                        a.keyboard.press("Control+s")
+                        wait_for(a, lambda: fake.pending_write is not None,
+                                 "Manual save did not start")
+                        edit_cell(a, cell, "9 * 8")
+                        fake.finish_pending_write()
+                        assert source(fake) == "8 * 8"
+                        expect(cell).to_have_text("9 * 8")
+                        writes_before_auto = fake.writes
+                        # No Ctrl+S here. Exercise the real configured JupyterLab
+                        # autosave timer (normally 120 s), not a direct API call.
+                        wait_for(a, lambda: source(fake) == "9 * 8",
+                                 "Autosave did not persist the edit made during upload", seconds=180)
+                        assert fake.writes > writes_before_auto
+                        print("Native autosave preserved and persisted an edit made during a pending save.")
+                        a.wait_for_timeout(1000)
+                        # Independent browser reopens the automatically saved version.
+                        cell_b = browse_remote(b)
+                        expect(cell_b).to_have_text("9 * 8")
                         # Simulate a remote modification and an unsaved local edit.
                         fake.version += 1
                         cell.click()
@@ -215,14 +276,17 @@ def main():
                         expect(modal).to_contain_text("Remote file changed", timeout=30000)
                         modal.get_by_role("button", name="Close", exact=True).click()
                         expect(modal).to_be_hidden()
-                        assert "".join(fake.notebook["cells"][1]["source"]).strip() == "7 * 8"
+                        assert source(fake) == "9 * 8"
                         # Recovery copies live editor contents to the default local drive.
+                        fake.unavailable = True
                         cell.click()
                         command(a, "Save local recovery copy")
                         dialog(a, "Local recovery copy saved")
                         recovered = a.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
                         expect(recovered).to_have_text("9 * 9")
-                        assert "".join(fake.notebook["cells"][1]["source"]).strip() == "7 * 8"
+                        assert source(fake) == "9 * 8"
+                        fake.unavailable = False
+                        print("Local recovery preserved unsaved edits during a simulated Drive outage.")
                         ctx_a.close()
                         ctx_b.close()
                         print("Mocked Drive round trip and stale-write rejection passed.")
