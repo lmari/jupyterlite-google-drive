@@ -39,3 +39,19 @@ test('native mount rejects a save before loading a baseline',async()=>{
   await assert.rejects(d.save(p,{content:nb}),/not supported/);
   assert.equal(fake.writes(),0);
 });
+
+test('closing a native editor allows reopening with a fresh baseline',async()=>{
+  const fake=create(), d=new NativeDrive(fake.api), p=d.mount('a','a.ipynb');
+  await d.get(p);d.release(p);fake.bump();
+  const next=d.mount('a','a.ipynb');assert.notEqual(next,p);
+  await d.get(next);await d.save(next,{content:nb});assert.equal(fake.writes(),1);
+});
+test('releasing an editor does not permit account switch during pending save',async()=>{
+  const fake=create();let finish;
+  const orig=fake.api.update;fake.api.update=async(...args)=>{await new Promise(r=>{finish=r;});return orig(...args);};
+  const d=new NativeDrive(fake.api),p=d.mount('a','a.ipynb');await d.get(p);
+  const saving=d.save(p,{content:nb});d.release(p);
+  assert.equal(d.hasPendingSave,true);assert.throws(()=>d.reset(),/current/);
+  assert.throws(()=>d.mount('a','a.ipynb'),/progress/);
+  finish();await saving;assert.equal(d.hasPendingSave,false);d.reset();
+});

@@ -21,7 +21,7 @@ const plugin = {
     contents.addDrive(native);
     const nativePanels = new Set();
     const requireClosed = () => {
-      if (nativePanels.size) throw new Error('Close all experimental Google Drive notebooks before reconnecting or disconnecting. Export unsaved work first.');
+      if (nativePanels.size || native.hasPendingSave) throw new Error('Close all experimental Google Drive notebooks before reconnecting or disconnecting. Export unsaved work first.');
     };
     const current = () => {
       const panel = tracker.currentWidget;
@@ -93,8 +93,13 @@ const plugin = {
       const path = native.mount(id, meta.name);
       const panel = docs.openOrReveal(native.name + ':' + path, 'Notebook');
       if (!panel) throw new Error('Could not open native notebook.');
-      nativePanels.add(panel);
-      panel.disposed.connect(() => nativePanels.delete(panel));
+      if (!nativePanels.has(panel)) {
+        nativePanels.add(panel);
+        panel.disposed.connect(() => {
+          nativePanels.delete(panel);
+          native.release(path);
+        });
+      }
       await panel.context.ready;
       await tell('Google Drive', 'Opened native notebook. Standard Save writes to Google Drive. For recovery, use Save a new copy or copy cells into a local notebook.');
     });

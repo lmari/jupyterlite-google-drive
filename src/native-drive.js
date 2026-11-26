@@ -16,21 +16,33 @@ export class NativeDrive {
   #generation = 0;
   constructor(api) { this.api = api; }
 
+  get hasPendingSave() { return [...this.#entries.values()].some(entry => entry.busy); }
+  release(path) {
+    const entry = this.#entries.get(path);
+    if (!entry) return;
+    if (entry.busy) entry.released = true;
+    else this.#entries.delete(path);
+  }
   reset() {
+    if (this.hasPendingSave) throw new Error('Wait for the current Google Drive save to finish.');
     this.#generation++;
     this.#entries.clear();
   }
   dispose() {
     if (this.isDisposed) return;
     this.isDisposed = true;
-    this.reset();
+    this.#generation++;
+    this.#entries.clear();
     Signal.clearData(this);
   }
   mount(id, name) {
     if (this.isDisposed) throw new Error('Drive disposed.');
     // One handle per file per auth session, so openOrReveal does not create
     // independent contexts for the same remote object.
-    for (const [path, entry] of this.#entries) if (entry.id === id) return path;
+    for (const [path, entry] of this.#entries) if (entry.id === id) {
+      if (entry.released) throw new Error('Previous save is still in progress.');
+      return path;
+    }
     const path = globalThis.crypto.randomUUID() + '--' + safeName(name);
     this.#entries.set(path, {id, name, version:null, modified:null, busy:false});
     return path;
@@ -94,7 +106,10 @@ export class NativeDrive {
       const model = this.#model(path,{...meta,capabilities:{canEdit:entry.canEdit}});
       this.fileChanged.emit({type:'save',oldValue:null,newValue:model});
       return model;
-    } finally { entry.busy = false; }
+    } finally {
+      entry.busy = false;
+      if (entry.released) this.#entries.delete(path);
+    }
   }
   async listCheckpoints() { return []; }
   // JupyterLab context treats HTTP 403 as an unavailable checkpoint.
