@@ -34,7 +34,7 @@ test('creates new file via multipart upload',async()=>{
   assert.match(calls[0].opts.body,/test\.ipynb/); assert.match(calls[0].opts.headers['Content-Type'],/multipart\/related/);
 });
 test('reports expired credentials',async()=>{
-  const {api}=mock({status:401,body:{}}); await assert.rejects(api.metadata('abc'),/Reconnect/);
+  const {api}=mock({status:401,body:{}}); await assert.rejects(api.metadata('abc'),/401.*Renew Google Drive authorization/);
 });
 
 test('lists all authorized notebook pages, filtering Google-native and other files',async()=>{
@@ -57,7 +57,7 @@ test('rejects incomplete or looping Drive pagination',async()=>{
   await assert.rejects(loop.api.listNotebooks(),/repeated/);
 });
 test('does not silently hide authorization failures while listing',async()=>{
-  const {api}=mock({status:401,body:{}}); await assert.rejects(api.listNotebooks(),/Reconnect/);
+  const {api}=mock({status:401,body:{}}); await assert.rejects(api.listNotebooks(),/401.*Renew Google Drive authorization/);
 });
 
 test('downloads binary data without JSON conversion and checks version',async()=>{

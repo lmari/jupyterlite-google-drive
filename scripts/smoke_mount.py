@@ -13,7 +13,7 @@ from tempfile import TemporaryDirectory
 from threading import Thread
 import shutil
 from playwright.sync_api import sync_playwright, expect
-from smoke_drive import FakeDrive, start, command, dialog, edit_cell
+from smoke_drive import FakeDrive, start, command, dialog, edit_cell, wait_for
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -96,6 +96,28 @@ def main():
                         assert fake.created_data == [("result.bin",bytes([0,255,128,65]))]
                         assert fake.writes == 0
                         print("Python output exported as a new binary file, without overwriting Drive data.")
+                        # Expired token, wrong account, then same-account renewal.
+                        fake.expire_original_token=True
+                        workspace.get_by_role("button",name="Refresh notebook list").click()
+                        dialog(page,"Drive request failed (401)")
+                        expect(workspace.get_by_role("status")).to_have_text("Authorization expired")
+                        page.evaluate("window.__driveAuthToken = 'other-token'")
+                        command(page,"Renew authorization")
+                        dialog(page,"Different Google account selected")
+                        expect(workspace.get_by_role("status")).to_have_text("Authorization expired")
+                        expect(cell).to_have_text('list(Path("/drive/output/result.bin").read_bytes())')
+                        page.evaluate("window.__driveAuthToken = 'renewed-token'")
+                        command(page,"Renew authorization")
+                        dialog(page,"Authorization renewed.")
+                        expect(workspace.get_by_role("status")).to_have_text("Authorized")
+                        expect(workspace.get_by_text("/drive/data/dati.csv",exact=True)).to_be_visible()
+                        expect(workspace.get_by_text("/drive/output/result.bin",exact=True)).to_be_visible()
+                        edit_cell(page,cell,'sum(int(r["x"]) for r in csv.DictReader(open("/drive/data/dati.csv")))')
+                        page.keyboard.press("Control+Enter")
+                        expect(output).to_have_text("50",timeout=60000)
+                        page.keyboard.press("Control+s")
+                        wait_for(page,lambda:fake.writes>0,"Save after renewal did not reach Drive")
+                        print("Same-account authorization renewed with notebook and data preserved; wrong account rejected.")
                         ctx.close()
                     except Exception:
                         if page and not page.is_closed():

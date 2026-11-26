@@ -16,7 +16,7 @@ const plugin = {
   activate(app, docs, menu, tracker) {
     const auth = new GoogleAuth({clientId: PageConfig.getOption('googleDriveClientId'),
       apiKey: PageConfig.getOption('googleDriveApiKey'), appId: PageConfig.getOption('googleDriveAppId')});
-    const drive = new DriveAPI(() => auth.token());
+    const drive = new DriveAPI(() => auth.token(),undefined,token=>auth.invalidate(token));
     let links = new WeakMap(); let busy = false; let prepared = false; let preparationError = '';
     let sidebar; let authorizedFiles = []; let listLoaded = false;
     const refreshSidebar = () => sidebar?.refresh();
@@ -28,7 +28,7 @@ const plugin = {
     const nativePanels = new Set();
     const saveFailures = new WeakMap();
     const requireClosed = () => {
-      if (nativePanels.size || native.hasPendingSave) throw new Error('Close all experimental Google Drive notebooks before reconnecting or disconnecting. Export unsaved work first.');
+      if (nativePanels.size || native.hasPendingSave) throw new Error('Close all experimental Google Drive notebooks before switching accounts or disconnecting. To keep them open, use Renew authorization. Export unsaved work first.');
     };
     const confirmOutputDiscard = async () => {
       if (!native.hasOutputs) return true;
@@ -61,6 +61,11 @@ const plugin = {
       if (!(await confirmOutputDiscard())) return;
       await auth.connect(); links = new WeakMap(); native.reset(); clearList();
       await tell('Google Drive', 'Connected. Choose Open from Drive or Save a new copy to Drive.');
+    });
+    const renew = add('renew','Google Drive: Renew authorization',async()=>{
+      if (!prepared) throw new Error(preparationError || 'Google libraries are loading. Retry shortly.');
+      await auth.renew();
+      await tell('Google Drive','Authorization renewed. Open notebooks, mounted data and temporary outputs were preserved. Retry any failed save.');
     });
     const openRemote = async id => {
       const {meta, content} = await drive.read(id);
@@ -206,7 +211,7 @@ const plugin = {
       });
       if (!answer.button.accept) return;
       const path = native.mountData(meta);
-      await tell('Google Drive', `Mounted /drive/${path}. In a native notebook with filesystem synchronization enabled, use open("/drive/${path}", "rb"). Mounts expire on reconnect or refresh.`);
+      await tell('Google Drive', `Mounted /drive/${path}. In a native notebook with filesystem synchronization enabled, use open("/drive/${path}", "rb"). Mounts expire on account switch, disconnect or refresh; same-account renewal preserves them.`);
     });
     const exportData = add('export-data', 'Google Drive: Export Python output as new file', async () => {
       const paths = native.listOutputs();
@@ -236,7 +241,7 @@ const plugin = {
       const isNative=hasNotebook && panel.context.path.startsWith(native.name+':');
       const info=isNative?native.saveInfo(contents.localPath(panel.context.path)):null;
       const saveStatus=hasNotebook?describeSave({isNative,linked:links.has(panel),dirty:panel.context.model.dirty,info,failed:saveFailures.has(panel),auth:auth.status}):null;
-      return {prepared,preparationError,busy,auth:auth.status,hasNotebook,isNative,saveStatus,
+      return {prepared,preparationError,busy,auth:auth.status,hasAccount:auth.hasAccount,hasNotebook,isNative,saveStatus,
         notebookName:hasNotebook?(info?.name || panel.context.path.split('/').pop()):'',
         current:!hasNotebook?'No active notebook':isNative?'Remote notebook — standard Save and autosave write to Drive':
           links.has(panel)?'Local copy — explicit Save to original writes to Drive':'Local notebook — browser storage',
@@ -249,7 +254,7 @@ const plugin = {
     native.fileChanged.connect(refreshSidebar);
     const showPanel='jupyterlite-google-drive:show-panel';
     app.commands.addCommand(showPanel,{label:'Google Drive: Show workspace',execute:()=>app.shell.activateById(sidebar.id)});
-    menu.fileMenu.addGroup([{command:showPanel},connect, open, browse, nativeOpen, save, saveAs, recover, importData, mountData, exportData, disconnect], 80);
+    menu.fileMenu.addGroup([{command:showPanel},connect, renew, open, browse, nativeOpen, save, saveAs, recover, importData, mountData, exportData, disconnect], 80);
     // Load external scripts only if configured; connect itself remains a user gesture.
     void auth.prepare().then(() => {prepared = true;refreshSidebar();}).catch(e => {preparationError = String(e.message || e);refreshSidebar();});
   }
