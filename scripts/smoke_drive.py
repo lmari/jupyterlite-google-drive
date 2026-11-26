@@ -187,6 +187,20 @@ def main():
                             a.wait_for_timeout(200)
                         assert fake.writes >= 2, "Native save did not reach Drive"
                         assert "".join(fake.notebook["cells"][1]["source"]).strip() == "7 * 8"
+                        # Exercise the real Pyodide kernel, not just the editor.
+                        cell.click()
+                        a.keyboard.press("Control+Enter")
+                        output = a.locator(".jp-Notebook:visible .jp-CodeCell .jp-OutputArea-output").first
+                        expect(output).to_have_text("56", timeout=180000)
+                        a.keyboard.press("Control+s")
+                        for _ in range(150):
+                            outputs = fake.notebook["cells"][1].get("outputs", [])
+                            if any("56" == "".join(o.get("data", {}).get("text/plain", [])).strip() for o in outputs):
+                                break
+                            a.wait_for_timeout(200)
+                        else:
+                            raise AssertionError("Executed Python output did not persist on simulated Drive")
+
                         # Simulate a remote modification and an unsaved local edit.
                         fake.version += 1
                         cell.click()
