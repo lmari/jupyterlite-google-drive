@@ -11,14 +11,15 @@
     "check": "node --check src/index.js && node --check src/auth.js && node --check src/drive-api.js"
   },
   "dependencies": {
-    "@jupyterlab/apputils": "^4.6.0",
+    "@jupyterlab/apputils": "~4.6.0",
     "@jupyterlab/coreutils": ">=6.5.0 <7",
-    "@jupyterlab/docmanager": "^4.6.0",
-    "@jupyterlab/mainmenu": "^4.6.0",
-    "@jupyterlab/notebook": "^4.6.0"
+    "@jupyterlab/docmanager": "~4.6.0",
+    "@jupyterlab/mainmenu": "~4.6.0",
+    "@jupyterlab/notebook": "~4.6.0"
   },
   "devDependencies": {
-    "@jupyter/builder": "^1.0.0"
+    "@jupyter/builder": "^1.0.0",
+    "@jupyterlab/core-meta": "~4.6.0"
   },
   "jupyterlab": {
     "extension": true,
