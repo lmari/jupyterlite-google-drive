@@ -1,4 +1,5 @@
 """Browser smoke test: menu registration and local notebook."""
+import argparse
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -8,11 +9,14 @@ import shutil
 from playwright.sync_api import sync_playwright, expect
 
 def main():
+    parser=argparse.ArgumentParser()
+    parser.add_argument("--site",default="dist")
+    args=parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     # Emulate project Pages hosting below a path prefix rather than at /.
     with TemporaryDirectory() as temp:
         site = Path(temp) / "jupyterlite-google-drive"
-        shutil.copytree(root / "dist", site)
+        shutil.copytree(root / args.site, site)
         with ThreadingHTTPServer(("127.0.0.1", 0), partial(SimpleHTTPRequestHandler, directory=temp)) as server:
             Thread(target=server.serve_forever, daemon=True).start()
             url = f"http://127.0.0.1:{server.server_port}/jupyterlite-google-drive/lab/index.html?path=welcome.ipynb"
@@ -43,8 +47,17 @@ def main():
                         expect(workspace.get_by_role("button",name="Save local recovery copy")).to_be_visible()
                         advanced.locator("summary").click()
                         expect(workspace.get_by_role("button",name="Import temporary data copy…")).to_be_hidden()
+                        if args.site == "wheel-demo":
+                            # Prove the installed environment actually executes Python.
+                            cell=page.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
+                            cell.click()
+                            page.keyboard.press("Control+Enter")
+                            output=page.locator(".jp-Notebook:visible .jp-CodeCell .jp-OutputArea-output").first
+                            expect(output).to_have_text("6",timeout=180000)
+                            print("Installed wheel site executed the real Python kernel.")
                         print("JupyterLite notebook, nineteen commands and collapsible advanced actions are verified.")
                     except Exception:
+                        print("Visible JupyterLab dialogs:",page.locator(".jp-Dialog:visible").all_text_contents())
                         page.screenshot(path=str(root / "smoke-failure.png"), full_page=True)
                         raise
                     finally:

@@ -6,3 +6,5 @@ dist/
 demo/jupyter-lite.json
 __pycache__/
 smoke-failure.png
+wheel-dist/
+wheel-demo/

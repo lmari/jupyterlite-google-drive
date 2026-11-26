@@ -1,10 +1,10 @@
 # jupyterlite-google-drive
 
-Experimental browser-only JupyterLab extension for JupyterLite. Version 0.6.0-beta.0 (classroom beta candidate). No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
+Experimental browser-only JupyterLab extension for JupyterLite. Version 0.6.0-beta.1 (distribution beta candidate). No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
 
 ## Status
 
-Experimental, not intended for sensitive files or production. The project owner has successfully connected a real Google account and reported the early native editor workflow working. The latest validated release (0.5 alpha 3) passed [47 unit tests and end-to-end browser tests](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45903501598), including live Python execution, both filesystem transports, notebook autosave and conflict recovery, binary export, same-account renewal and fresh-browser dependency restoration. CI uses real JupyterLite/Pyodide but mocked Google services. Full acceptance on GitHub Pages with real Google accounts remains outstanding.
+Experimental, not intended for sensitive files or production. The project owner has successfully connected a real Google account and reported the early native editor workflow working. The latest validated release (0.6 beta 0) passed [47 unit tests and end-to-end browser tests](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45904656879), including live Python execution, both filesystem transports, notebook autosave and conflict recovery, binary export, same-account renewal and fresh-browser dependency restoration. CI uses real JupyterLite/Pyodide but mocked Google services. Full acceptance on GitHub Pages with real Google accounts remains outstanding.
 
 [Open the published experimental demo](https://lmari.github.io/jupyterlite-google-drive/lab/index.html). See [Google Cloud setup](docs/google-cloud.md) for running your own deployment.
 
@@ -73,6 +73,10 @@ See the detailed [step-by-step deployment guide](docs/google-cloud.md).
 4. Create an API key restricted to the appropriate web referrers and Picker/Drive APIs; include the Picker iframe referrer `https://docs.google.com/*`. Get the numeric Google Cloud project number (Picker app ID, not project name). All credentials must belong to the same project.
 5. Copy `demo/jupyter-lite.example.json` to `demo/jupyter-lite.json` and fill the three values as strings. `drive.file` only grants access to files created by the app or explicitly selected/authorized. No broad Drive scope.
 
+## Install into your own JupyterLite site
+
+See [distribution guide](docs/distribution.md). CI packages a prebuilt Python wheel; install it in the Python environment that builds JupyterLite, not inside a notebook. Then run the normal JupyterLite build. The wheel contains no Google account configuration. Configure your own Google Cloud project and site origin. No registry publication has been performed.
+
 ## Build and smoke test
 
 Requires Python 3.10+ and Node.js 22. From project root:
@@ -97,7 +101,7 @@ Open `http://localhost:8000/lab/index.html` directly, not inside an iframe for t
 
 ## Continuous integration and GitHub Pages
 
-The Build and test workflow runs on pushes to main and pull requests. It checks JS syntax, runs unit tests, builds the extension with jupyter-builder (JupyterLab 4.6), builds JupyterLite, then starts Chromium against the site under a project URL prefix. It verifies the local demo notebook and eleven Google Drive menu commands. A separate browser integration test uses fake Google authorization, Picker and Drive HTTP responses with two independent browser contexts to exercise local import, remote update, stale-write rejection and reopening through the authorized notebook list. The native browser test executes a real Python cell using Pyodide and checks persistence of its output. Google authorization and HTTP Drive responses are simulated; no real Google login is asserted. The resulting static site is downloadable as a workflow artifact.
+The Build and test workflow runs on pushes to main and pull requests. It checks JS syntax, runs unit tests, builds the extension with jupyter-builder (JupyterLab 4.6), builds JupyterLite, then starts Chromium against the site under a project URL prefix. It verifies the local demo notebook and nineteen Google Drive menu commands. A separate browser integration test uses fake Google authorization, Picker and Drive HTTP responses with two independent browser contexts to exercise local import, remote update, stale-write rejection and reopening through the authorized notebook list. The native browser test executes a real Python cell using Pyodide and checks persistence of its output. Google authorization and HTTP Drive responses are simulated; no real Google login is asserted. The resulting static site is downloadable as a workflow artifact.
 
 To publish a demo, set Settings > Pages > Source to GitHub Actions. Then either run the Build and test workflow manually with its deploy option or create repository Actions variable PAGES_ENABLED=true for automatic deployment on pushes to main. The deployment job only runs after the build and browser checks pass.
 

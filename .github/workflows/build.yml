@@ -32,7 +32,7 @@ jobs:
           python-version: '3.12'
       - name: Install build dependencies
         run: |
-          python -m pip install -r requirements-build.txt
+          python -m pip install -r requirements-build.txt build
           npm install
       - name: Check JavaScript and run unit tests
         run: |
@@ -50,6 +50,18 @@ jobs:
         run: python scripts/smoke_mount.py
       - name: Test mounted Python data through Pages-like service worker
         run: python scripts/smoke_mount.py --transport service-worker
+      - name: Package prebuilt Python wheel
+        run: python scripts/package_wheel.py
+      - name: Verify installed wheel in separate JupyterLite build
+        run: python scripts/smoke_wheel.py
+      - name: Verify installed extension in browser
+        run: python scripts/smoke_browser.py --site wheel-demo
+      - name: Upload installable extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: jupyterlite-google-drive-wheel
+          path: wheel-dist/*.whl
+          if-no-files-found: error
       - name: Upload diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
