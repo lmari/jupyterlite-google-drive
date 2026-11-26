@@ -1,6 +1,6 @@
 # jupyterlite-google-drive
 
-Experimental browser-only JupyterLab extension for JupyterLite. Version 0.6.0-beta.2 (menu refinement). No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
+Experimental browser-only JupyterLab extension for JupyterLite. Version 0.6.0-beta.3 (touch runtime experiment). No fork of JupyterLite, no backend. Experimental branch target: JupyterLite 0.9.0b2 / JupyterLab 4.7.0b2. The published baseline remains 0.6.0-beta.2. See [touch comparison](docs/touch-experiment.md).
 
 ## Status
 

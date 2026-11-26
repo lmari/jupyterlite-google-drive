@@ -1,6 +1,6 @@
 {
   "name": "jupyterlite-google-drive",
-  "version": "0.6.0-beta.2",
+  "version": "0.6.0-beta.3",
   "description": "Browser-only JupyterLite notebook persistence and Python data import from Google Drive",
   "license": "BSD-3-Clause",
   "type": "module",
@@ -11,18 +11,18 @@
     "check": "node --check src/index.js && node --check src/auth.js && node --check src/drive-api.js && node --check src/native-drive.js && node --check src/kernel-data.js && node --check src/sidebar.js && node --check src/save-status.js && node --check src/dependencies.js && node --check src/recovery.js"
   },
   "dependencies": {
-    "@jupyterlab/apputils": "~4.6.0",
-    "@jupyterlab/coreutils": ">=6.5.0 <7",
-    "@jupyterlab/docmanager": "~4.6.0",
-    "@jupyterlab/mainmenu": "~4.6.0",
-    "@jupyterlab/notebook": "~4.6.0",
-    "@lumino/signaling": "^2.1.0",
-    "@lumino/widgets": "^2.7.0",
-    "@jupyterlab/ui-components": "~4.6.0"
+    "@jupyterlab/apputils": "4.8.0-beta.2",
+    "@jupyterlab/coreutils": "6.7.0-beta.2",
+    "@jupyterlab/docmanager": "4.7.0-beta.2",
+    "@jupyterlab/mainmenu": "4.7.0-beta.2",
+    "@jupyterlab/notebook": "4.7.0-beta.2",
+    "@lumino/signaling": "2.1.6",
+    "@lumino/widgets": "2.10.0",
+    "@jupyterlab/ui-components": "4.7.0-beta.2"
   },
   "devDependencies": {
     "@jupyter/builder": "^1.0.0",
-    "@jupyterlab/core-meta": "~4.6.0"
+    "@jupyterlab/core-meta": "4.7.0-beta.2"
   },
   "jupyterlab": {
     "extension": true,

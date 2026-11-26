@@ -1,16 +1,16 @@
 # Install the prebuilt extension
 
-Experimental beta candidate, not approved for production or classroom deployment. The package is a JupyterLab federated frontend extension for JupyterLite 0.8.7 / JupyterLab 4.6.6 / Pyodide 0.8.7. It has no server extension. Compatibility outside this tested combination is not established.
+Experimental beta candidate, not approved for production or classroom deployment. The package is a JupyterLab federated frontend extension for JupyterLite 0.9.0b2 / JupyterLab 4.7.0b2 / Pyodide kernel 0.9.0b0 (experimental combination; verification pending). It has no server extension. Compatibility outside this tested combination is not established.
 
 ## Install and build
 
-After a successful CI run, download the `jupyterlite-google-drive-wheel` artifact from GitHub Actions, extract the ZIP, and install the .whl in a fresh Python virtual environment (Python 3.10 or later):
+After a successful CI run, download the `jupyterlite-google-drive-wheel` artifact from GitHub Actions, extract the ZIP, and install the .whl in a fresh Python virtual environment (Python 3.11 or later):
 
 ```sh
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install jupyterlite-core==0.8.7 jupyterlite-pyodide-kernel==0.8.7
-python -m pip install ./jupyterlite_google_drive-0.6.0b2-py3-none-any.whl
+python -m pip install jupyterlite-core==0.9.0b2 jupyterlite-pyodide-kernel==0.9.0b0
+python -m pip install ./jupyterlite_google_drive-0.6.0b3-py3-none-any.whl
 ```
 
 On Windows activate with `.venv\Scripts\activate`. The actual wheel filename follows the version in the artifact. You do not need Node.js or npm to install a prebuilt wheel. Do not use `%pip install` in a running notebook: installation is a site-build operation.
