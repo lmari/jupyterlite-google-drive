@@ -51,7 +51,12 @@ def main():
                             # Registration alone is insufficient: the page must be controlled.
                             page.wait_for_function("navigator.serviceWorker.controller !== null",timeout=60000)
                         print("Testing DriveFS transport:",args.transport)
-                        command(page,"Open native notebook (experimental)")
+                        command(page,"Show workspace")
+                        workspace=page.locator("#jupyterlite-google-drive-sidebar")
+                        expect(workspace.get_by_role("status")).to_have_text("Authorized")
+                        workspace.get_by_role("button",name="Refresh notebook list").click()
+                        expect(workspace.get_by_role("button",name="Open remote.ipynb",exact=True)).to_be_enabled(timeout=30000)
+                        workspace.get_by_role("button",name="Open remote.ipynb",exact=True).click()
                         dialog(page,"Experimental remote editor")
                         dialog(page,"Opened native notebook")
                         cell=page.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
@@ -60,6 +65,7 @@ def main():
                         command(page,"Mount read-only data file (experimental)")
                         dialog(page,"Mount read-only data?")
                         dialog(page,"Mounted /drive/data/dati.csv")
+                        expect(workspace.get_by_text("/drive/data/dati.csv",exact=True)).to_be_visible()
                         edit_cell(page,cell,'import csv; sum(int(r["x"]) for r in csv.DictReader(open("/drive/data/dati.csv")))')
                         page.keyboard.press("Control+Enter")
                         output=page.locator(".jp-Notebook:visible .jp-CodeCell .jp-OutputArea-output").first
@@ -76,6 +82,7 @@ def main():
                         page.keyboard.press("Control+Enter")
                         expect(output).to_have_text("4",timeout=60000)
                         assert fake.created_data == []
+                        expect(workspace.get_by_text("/drive/output/result.bin",exact=True)).to_be_visible()
                         edit_cell(page,cell,'list(Path("/drive/output/result.bin").read_bytes())')
                         page.keyboard.press("Control+Enter")
                         expect(output).to_have_text("[0, 255, 128, 65]",timeout=60000)

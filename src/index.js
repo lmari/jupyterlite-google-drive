@@ -7,6 +7,7 @@ import {GoogleAuth} from './auth.js';
 import {DriveAPI, notebookName} from './drive-api.js';
 import {NativeDrive} from './native-drive.js';
 import {dataPath, transferData} from './kernel-data.js';
+import {DriveSidebar} from './sidebar.js';
 
 const plugin = {
   id: 'jupyterlite-google-drive:plugin', autoStart: true,
@@ -16,6 +17,9 @@ const plugin = {
       apiKey: PageConfig.getOption('googleDriveApiKey'), appId: PageConfig.getOption('googleDriveAppId')});
     const drive = new DriveAPI(() => auth.token());
     let links = new WeakMap(); let busy = false; let prepared = false; let preparationError = '';
+    let sidebar; let authorizedFiles = []; let listLoaded = false;
+    const refreshSidebar = () => sidebar?.refresh();
+    const clearList = () => { authorizedFiles=[]; listLoaded=false; };
     const tell = (title, body) => showDialog({title, body, buttons: [Dialog.okButton()]});
     const contents = app.serviceManager.contents;
     const native = new NativeDrive(drive);
@@ -38,11 +42,11 @@ const plugin = {
       if (!panel || app.shell.currentWidget !== panel) throw new Error('Select an open notebook first.');
       return panel;
     };
-    const run = fn => async () => {
+    const run = fn => async (args) => {
       if (busy) return;
-      busy = true;
-      try { await fn(); } catch (e) { await tell('Google Drive', String(e.message || e)); }
-      finally { busy = false; }
+      busy = true; refreshSidebar();
+      try { await fn(args); } catch (e) { await tell('Google Drive', String(e.message || e)); }
+      finally { busy = false; refreshSidebar(); }
     };
     const add = (name, label, fn) => {
       const id = 'jupyterlite-google-drive:' + name;
@@ -53,7 +57,7 @@ const plugin = {
       if (!prepared) throw new Error(preparationError || 'Google libraries are loading. Retry shortly.');
       requireClosed();
       if (!(await confirmOutputDiscard())) return;
-      await auth.connect(); links = new WeakMap(); native.reset();
+      await auth.connect(); links = new WeakMap(); native.reset(); clearList();
       await tell('Google Drive', 'Connected. Choose Open from Drive or Save a new copy to Drive.');
     });
     const openRemote = async id => {
@@ -91,14 +95,17 @@ const plugin = {
       const selected = files[items.indexOf(result.value)];
       if (selected) await openRemote(selected.id);
     });
-    const nativeOpen = add('native-open', 'Google Drive: Open native notebook (experimental)', async () => {
+    const nativeOpen = add('native-open', 'Google Drive: Open native notebook (experimental)', async (args={}) => {
       const answer = await showDialog({
         title: 'Experimental remote editor',
         body: 'This notebook opens directly on Google Drive. Standard save and JupyterLab autosave may write remotely. Checkpoints are available only in the current editor session; rename and delete are not implemented. You can make a local recovery copy without Google access. Use a disposable notebook only. Close it before switching accounts.',
         buttons: [Dialog.cancelButton(), Dialog.okButton({label:'Continue'})]
       });
       if (!answer.button.accept) return;
-      const id = await auth.pick(); if (!id) return;
+      // A sidebar row may open a file from the current authorized listing.
+      const id = args.fileId ? authorizedFiles.find(f=>f.id===args.fileId)?.id : await auth.pick();
+      if (args.fileId && !id) throw new Error('Refresh the authorized notebook list first.');
+      if (!id) return;
       const meta = await drive.metadata(id);
       if (meta.trashed || !/\.ipynb$/i.test(meta.name)) throw new Error('Select a non-trashed .ipynb file.');
       const path = native.mount(id, meta.name);
@@ -208,12 +215,31 @@ const plugin = {
     const disconnect = add('disconnect', 'Google Drive: Disconnect', async () => {
       requireClosed();
       if (!(await confirmOutputDiscard())) return;
-      auth.disconnect(); links = new WeakMap(); native.reset();
+      auth.disconnect(); links = new WeakMap(); native.reset(); clearList();
       await tell('Google Drive', 'Disconnected. Local notebook copies remain in this browser.');
     });
-    menu.fileMenu.addGroup([connect, open, browse, nativeOpen, save, saveAs, recover, importData, mountData, exportData, disconnect], 80);
+    const refreshList=add('refresh-list','Google Drive: Refresh workspace list',async()=>{
+      authorizedFiles=await drive.listNotebooks();listLoaded=true;
+    });
+    sidebar=new DriveSidebar(app.commands,()=>{
+      const panel=tracker.currentWidget;
+      const hasNotebook=!!panel && !panel.isDisposed && app.shell.currentWidget===panel;
+      const isNative=hasNotebook && panel.context.path.startsWith(native.name+':');
+      return {prepared,preparationError,busy,auth:auth.status,hasNotebook,isNative,
+        current:!hasNotebook?'No active notebook':isNative?'Remote notebook — standard Save and autosave write to Drive':
+          links.has(panel)?'Local copy — explicit Save to original writes to Drive':'Local notebook — browser storage',
+        files:auth.status==='connected'?authorizedFiles.map(f=>({id:f.id,name:f.name,readOnly:f.capabilities?.canEdit===false,
+          modified:f.modifiedTime?new Date(f.modifiedTime).toLocaleString():''})):[],
+        loaded:listLoaded,data:native.listData(),outputs:native.listOutputs()};
+    });
+    app.shell.add(sidebar,'left',{rank:700});
+    tracker.currentChanged.connect(refreshSidebar);
+    native.fileChanged.connect(refreshSidebar);
+    const showPanel='jupyterlite-google-drive:show-panel';
+    app.commands.addCommand(showPanel,{label:'Google Drive: Show workspace',execute:()=>app.shell.activateById(sidebar.id)});
+    menu.fileMenu.addGroup([{command:showPanel},connect, open, browse, nativeOpen, save, saveAs, recover, importData, mountData, exportData, disconnect], 80);
     // Load external scripts only if configured; connect itself remains a user gesture.
-    void auth.prepare().then(() => {prepared = true;}).catch(e => {preparationError = String(e.message || e);});
+    void auth.prepare().then(() => {prepared = true;refreshSidebar();}).catch(e => {preparationError = String(e.message || e);refreshSidebar();});
   }
 };
 export default plugin;
