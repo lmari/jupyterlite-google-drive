@@ -4,7 +4,7 @@ Experimental browser-only JupyterLab extension for JupyterLite. Version 0.1.0-al
 
 ## Status
 
-Initial source prototype. The Drive API adapter has Node tests with mocked HTTP responses. CI build, seven unit tests, browser menu activation and Pages deployment passed in run [45866198530](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45866198530). A new mocked Drive browser integration test checks the two-browser workflow; inspect subsequent Actions results for its status. Real OAuth/Picker integration is not yet verified. Not yet appropriate for production or sensitive files.
+Initial source prototype. The Drive API adapter has Node tests with mocked HTTP responses. CI build, seven unit tests, browser menu activation and Pages deployment passed in run [45866198530](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45866198530). The mocked Drive integration test also passed in [run 45867383860](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45867383860): two isolated browser contexts successfully imported the same notebook, saved an edit, rejected a stale write, and reopened the updated notebook. Real Google authorization and API behavior still require a manual acceptance test. Real OAuth/Picker integration is not yet verified. Not yet appropriate for production or sensitive files.
 
 ## Workflow
 
