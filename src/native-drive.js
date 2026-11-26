@@ -1,5 +1,7 @@
 import {Signal} from '@lumino/signaling';
-import {notebookName, validateNotebook} from './drive-api.js';
+import {notebookName, validateNotebook, validateDataMetadata} from './drive-api.js';
+
+import {dataPath, toBase64} from './kernel-data.js';
 
 const epoch = '1970-01-01T00:00:00.000Z';
 const unavailable = () => Object.assign(new Error('Google Drive: this operation is not supported in the experimental notebook drive.'), {response:{status:403}});
@@ -13,6 +15,7 @@ export class NativeDrive {
   isDisposed = false;
   fileChanged = new Signal(this);
   #entries = new Map();
+  #data = new Map();
   #generation = 0;
   constructor(api) { this.api = api; }
 
@@ -27,12 +30,14 @@ export class NativeDrive {
     if (this.hasPendingSave) throw new Error('Wait for the current Google Drive save to finish.');
     this.#generation++;
     this.#entries.clear();
+    this.#data.clear();
   }
   dispose() {
     if (this.isDisposed) return;
     this.isDisposed = true;
     this.#generation++;
     this.#entries.clear();
+    this.#data.clear();
     Signal.clearData(this);
   }
   mount(id, name) {
@@ -46,6 +51,41 @@ export class NativeDrive {
     const path = globalThis.crypto.randomUUID() + '--' + safeName(name);
     this.#entries.set(path, {id, name, version:null, modified:null, busy:false});
     return path;
+  }
+  // Explicitly authorized read-only data aliases, shared by native notebooks
+  // within the current connection. Do not silently replace another file.
+  mountData(meta) {
+    if (this.isDisposed) throw new Error('Drive disposed.');
+    validateDataMetadata(meta);
+    if (!meta.id) throw new Error('Missing Drive file ID.');
+    const path = 'data/' + dataPath(meta.name).split('/').pop();
+    const previous = this.#data.get(path);
+    if (previous && previous.id !== meta.id) throw new Error('A different data file already uses this name. Rename it in Google Drive before mounting.');
+    this.#data.set(path, {id:meta.id,meta});
+    return path;
+  }
+  #dataModel(path,meta,bytes=null) {
+    const size = Number(meta.size);
+    return {name:path.split('/').pop(),path,type:'file',writable:false,
+      created:meta.modifiedTime || epoch,last_modified:meta.modifiedTime || epoch,
+      mimetype:meta.mimeType,format:bytes === null ? null : 'base64',
+      content:bytes === null ? null : toBase64(bytes),
+      size:bytes === null ? (Number.isSafeInteger(size) && size >= 0 ? size : null) : bytes.byteLength};
+  }
+  #directory(path,content) {
+    return {name:path,path,type:'directory',writable:false,created:epoch,last_modified:epoch,
+      mimetype:null,format:content === null ? null : 'json',content,size:null};
+  }
+  async #getData(path, options) {
+    const entry = this.#data.get(path);
+    if (!entry || this.isDisposed) throw new Error('Data file is not mounted. Select it from Google Drive first.');
+    const generation = this.#generation;
+    const result = options.content === false
+      ? {meta:validateDataMetadata(await this.api.metadata(entry.id)),bytes:null}
+      : await this.api.readData(entry.id);
+    if (this.isDisposed || generation !== this.#generation || this.#data.get(path) !== entry) throw new Error('Google Drive authorization changed; mount the data file again.');
+    entry.meta = result.meta;
+    return this.#dataModel(path,result.meta,result.bytes);
   }
   #entry(path) {
     const entry = this.#entries.get(path);
@@ -67,11 +107,14 @@ export class NativeDrive {
   }
   async get(path, options = {}) {
     if (!path || path === '/') {
-      return {name:'',path:'',type:'directory',writable:false,created:epoch,last_modified:epoch,
-        mimetype:null,format:options.content === false ? null : 'json',
-        content:options.content === false ? null : [...this.#entries].map(([p,e]) =>
-          this.#model(p,{modifiedTime:e.modified,capabilities:{canEdit:e.canEdit}})),size:null};
+      return this.#directory('',options.content === false ? null : [
+        this.#directory('data',null),
+        ...[...this.#entries].map(([p,e]) => this.#model(p,{modifiedTime:e.modified,capabilities:{canEdit:e.canEdit}}))
+      ]);
     }
+    if (path === 'data' || path === 'data/') return this.#directory('data',
+      options.content === false ? null : [...this.#data].map(([p,e]) => this.#dataModel(p,e.meta)));
+    if (path.startsWith('data/')) return this.#getData(path,options);
     const entry = this.#entry(path);
     const generation = this.#generation;
     if (options.content === false) {
@@ -96,6 +139,8 @@ export class NativeDrive {
     return entry.savedSnapshot === undefined || entry.savedSnapshot !== JSON.stringify(content);
   }
   async save(path, options = {}) {
+    if (path === 'data' || path.startsWith('data/')) throw unavailable();
+    if (options.type && options.type !== 'notebook') throw unavailable();
     const entry = this.#entry(path);
     if (!entry.version || entry.canEdit === false) throw unavailable();
     if (entry.busy) throw new Error('A Google Drive save is already in progress.');

@@ -105,3 +105,33 @@ test('checkpoint restore refuses a stale remote version and checkpoints expire w
   const next=d.mount('a','a.ipynb');await d.get(next);
   assert.deepEqual(await d.listCheckpoints(next),[]);
 });
+
+const csvMeta={id:'csv-id',name:'dati.csv',mimeType:'text/csv',size:'4',version:'1'};
+test('mount read-only data aliases and return bytes via contents base64 format',async()=>{
+  let content=Uint8Array.of(0,255,1,2);
+  const api={metadata:async()=>csvMeta,readData:async()=>({meta:csvMeta,bytes:content})};
+  const d=new NativeDrive(api);
+  assert.equal(d.mountData(csvMeta),'data/dati.csv');
+  const root=await d.get('');
+  assert.ok(root.content.some(x=>x.name==='data'&&x.type==='directory'));
+  assert.equal((await d.get('data')).content[0].name,'dati.csv');
+  const m=await d.get('data/dati.csv',{content:false});
+  assert.equal(m.size,4);assert.equal(m.writable,false);assert.equal(m.content,null);
+  assert.equal((await d.get('data/dati.csv')).content,'AP8BAg==');
+  content=Uint8Array.of(4,5);
+  assert.equal((await d.get('data/dati.csv')).content,'BAU=');
+  await assert.rejects(d.save('data/dati.csv',{type:'file',content:'x'}),/not supported/);
+  await assert.rejects(d.delete('data/dati.csv'),/not supported/);
+  d.reset();assert.deepEqual((await d.get('data')).content,[]);
+  await assert.rejects(d.get('data/dati.csv'),/not mounted/);
+});
+test('rejects invalid data mounts, collisions and stale in-flight read after reset',async()=>{
+  let finish;
+  const api={readData:()=>new Promise(r=>{finish=r;})};
+  const d=new NativeDrive(api);d.mountData(csvMeta);
+  assert.throws(()=>d.mountData({...csvMeta,id:'other'}),/different data file/);
+  assert.throws(()=>d.mountData({...csvMeta,mimeType:'application/vnd.google-apps.spreadsheet'}),/regular data file/);
+  const reading=d.get('data/dati.csv');d.reset();
+  finish({meta:csvMeta,bytes:Uint8Array.of(1)});
+  await assert.rejects(reading,/authorization changed/);
+});

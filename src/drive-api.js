@@ -14,6 +14,16 @@ export function notebookName(name) {
   const safe = clean || 'Notebook';
   return /\.ipynb$/i.test(safe) ? safe : safe + '.ipynb';
 }
+export function validateDataMetadata(meta) {
+    if (meta.trashed || typeof meta.name !== 'string' ||
+        /\.ipynb$/i.test(meta.name) || !meta.mimeType ||
+        meta.mimeType.startsWith('application/vnd.google-apps.')) {
+      throw new Error('Select a regular data file, not a notebook, folder or Google-native document.');
+    }
+    if (Number(meta.size) > maxDataBytes) throw new Error('Data file exceeds the 5 MiB experimental limit.');
+    if (!meta.version) throw new Error('Drive did not return a file version.');
+  return meta;
+}
 export class DriveAPI {
   constructor(token, fetcher = globalThis.fetch.bind(globalThis)) {
     this.token = token; this.fetcher = fetcher;
@@ -60,13 +70,7 @@ export class DriveAPI {
   }
   async readData(id) {
     const before = await this.metadata(id);
-    if (before.trashed || typeof before.name !== 'string' ||
-        /\.ipynb$/i.test(before.name) || !before.mimeType ||
-        before.mimeType.startsWith('application/vnd.google-apps.')) {
-      throw new Error('Select a regular data file, not a notebook, folder or Google-native document.');
-    }
-    if (Number(before.size) > maxDataBytes) throw new Error('Data file exceeds the 5 MiB experimental limit.');
-    if (!before.version) throw new Error('Drive did not return a file version.');
+    validateDataMetadata(before);
     const response = await this.request(`${base}/${encodeURIComponent(id)}?alt=media`);
     if (Number(response.headers.get('content-length')) > maxDataBytes) {
       await response.body?.cancel();
