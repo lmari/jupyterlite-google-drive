@@ -29,9 +29,16 @@ def main():
                         page.goto(url, wait_until="domcontentloaded", timeout=120000)
                         expect(page.locator(".jp-Notebook").first).to_be_visible(timeout=120000)
                         page.locator(".lm-MenuBar-item").filter(has_text="File").first.click()
+                        # File has a single Drive submenu, never a flat list of commands.
+                        file_menu=page.locator(".lm-Menu:visible").first
+                        expect(file_menu.get_by_role("menuitem",name="Google Drive",exact=True)).to_have_count(1)
+                        expect(file_menu.get_by_text("Google Drive: Show workspace",exact=True)).to_have_count(0)
+                        file_menu.get_by_role("menuitem",name="Google Drive",exact=True).hover()
+                        drive_menu=page.locator("#jupyterlite-google-drive-menu")
+                        expect(drive_menu).to_be_visible(timeout=30000)
                         for label in ["Show workspace", "Connect", "Renew authorization", "Open notebook", "Browse authorized notebooks", "Open native notebook (experimental)", "Save to original", "Save a new copy", "Save local recovery copy", "Download notebook recovery file", "Import data into Python", "Mount read-only data file (experimental)", "Remember mounted data in notebook", "Add selected data dependency", "Remove recorded data dependency", "Restore notebook data dependencies", "Export Python output as new file", "Download Python output locally", "Disconnect"]:
-                            expect(page.get_by_text("Google Drive: " + label, exact=True)).to_be_visible(timeout=30000)
-                        page.get_by_text("Google Drive: Show workspace",exact=True).click()
+                            expect(drive_menu.get_by_text(label, exact=True)).to_be_visible(timeout=30000)
+                        drive_menu.get_by_text("Show workspace",exact=True).click()
                         workspace=page.locator("#jupyterlite-google-drive-sidebar")
                         expect(workspace).to_be_visible(timeout=30000)
                         expect(workspace.get_by_role("heading",name="Google Drive",exact=True)).to_be_visible()
@@ -55,7 +62,7 @@ def main():
                             output=page.locator(".jp-Notebook:visible .jp-CodeCell .jp-OutputArea-output").first
                             expect(output).to_have_text("6",timeout=180000)
                             print("Installed wheel site executed the real Python kernel.")
-                        print("JupyterLite notebook, nineteen commands and collapsible advanced actions are verified.")
+                        print("JupyterLite notebook, one Drive submenu with nineteen commands and collapsible advanced actions are verified.")
                     except Exception:
                         print("Visible JupyterLab dialogs:",page.locator(".jp-Dialog:visible").all_text_contents())
                         page.screenshot(path=str(root / "smoke-failure.png"), full_page=True)

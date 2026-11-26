@@ -3,6 +3,7 @@ import {PageConfig} from '@jupyterlab/coreutils';
 import {IDocumentManager} from '@jupyterlab/docmanager';
 import {IMainMenu} from '@jupyterlab/mainmenu';
 import {INotebookTracker} from '@jupyterlab/notebook';
+import {Menu} from '@lumino/widgets';
 import {GoogleAuth} from './auth.js';
 import {DriveAPI, notebookName} from './drive-api.js';
 import {NativeDrive} from './native-drive.js';
@@ -64,7 +65,7 @@ const plugin = {
     };
     const add = (name, label, fn) => {
       const id = 'jupyterlite-google-drive:' + name;
-      app.commands.addCommand(id, {label, execute: run(fn)});
+      app.commands.addCommand(id, {label:args=>args.inDriveMenu?label.replace(/^Google Drive: /,''):label, execute: run(fn)});
       return {command: id};
     };
     const connect = add('connect', 'Google Drive: Connect', async () => {
@@ -364,8 +365,23 @@ const plugin = {
     tracker.currentChanged.connect(refreshSidebar);
     native.fileChanged.connect(refreshSidebar);
     const showPanel='jupyterlite-google-drive:show-panel';
-    app.commands.addCommand(showPanel,{label:'Google Drive: Show workspace',execute:()=>app.shell.activateById(sidebar.id)});
-    menu.fileMenu.addGroup([{command:showPanel},connect, renew, open, browse, nativeOpen, save, saveAs, recover, downloadNotebook, importData, mountData, rememberData, addDataDependency, removeDataDependency, restoreData, exportData, downloadOutput, disconnect], 80);
+    app.commands.addCommand(showPanel,{label:args=>args.inDriveMenu?'Show workspace':'Google Drive: Show workspace',execute:()=>app.shell.activateById(sidebar.id)});
+    // One top-level File item. Preserve command IDs and full labels outside
+    // this submenu, so the sidebar and command registry are unaffected.
+    const driveMenu=new Menu({commands:app.commands});
+    driveMenu.id='jupyterlite-google-drive-menu';
+    driveMenu.title.label='Google Drive';
+    const groups=[
+      [{command:showPanel},connect,renew,disconnect],
+      [nativeOpen,open,browse,save,saveAs],
+      [mountData,addDataDependency,removeDataDependency,restoreData,rememberData,importData],
+      [exportData,downloadOutput,recover,downloadNotebook]
+    ];
+    groups.forEach((group,i)=>{
+      if(i)driveMenu.addItem({type:'separator'});
+      group.forEach(item=>driveMenu.addItem({...item,args:{inDriveMenu:true}}));
+    });
+    menu.fileMenu.addGroup([{type:'submenu',submenu:driveMenu}],80);
     // Load external scripts only if configured; connect itself remains a user gesture.
     void auth.prepare().then(() => {prepared = true;refreshSidebar();}).catch(e => {preparationError = String(e.message || e);refreshSidebar();});
   }

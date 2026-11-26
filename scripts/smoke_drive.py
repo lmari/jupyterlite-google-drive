@@ -148,7 +148,10 @@ def edit_cell(page, cell, text):
 
 def command(page, label):
     page.locator(".lm-MenuBar-item").filter(has_text="File").first.click()
-    page.get_by_text("Google Drive: " + label, exact=True).click()
+    page.get_by_role("menuitem",name="Google Drive",exact=True).hover()
+    submenu=page.locator("#jupyterlite-google-drive-menu")
+    expect(submenu).to_be_visible(timeout=30000)
+    submenu.get_by_text(label,exact=True).click()
 
 def dialog(page, message):
     # Match the expected dialog, not a moving .last locator: the next
