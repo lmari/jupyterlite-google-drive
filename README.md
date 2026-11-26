@@ -1,10 +1,14 @@
 # jupyterlite-google-drive
 
-Experimental browser-only JupyterLab extension for JupyterLite. Version 0.3.0-alpha.3. No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
+Experimental browser-only JupyterLab extension for JupyterLite. Version 0.4.0-alpha.1. No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
 
 ## Status
 
 Initial source prototype. The Drive API adapter has Node tests with mocked HTTP responses. CI build, seven unit tests, browser menu activation and Pages deployment passed in run [45866198530](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45866198530). The mocked Drive integration test also passed in [run 45867383860](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45867383860): two isolated browser contexts successfully imported the same notebook, saved an edit, rejected a stale write, and reopened the updated notebook. The project owner reported successful real Google connection after adding the account as a test user. A complete independently verified real Drive round trip is still outstanding. Not yet appropriate for production or sensitive files.
+
+## Google Drive workspace (0.4 alpha)
+
+Open File > Google Drive: Show workspace or the Drive tab in the left sidebar. The panel reports authorization state (not network health), the current notebook's persistence mode, authorized notebooks after explicit refresh, mounted data paths and temporary output paths. Open an already-authorized notebook directly in the native editor, or use Picker to select another file. All existing File menu commands remain available. No extra OAuth scopes, persistent credentials, folder tree, or changes to remote save semantics. The authorization status updates on expiry; reconnect still requires closing native editors and exporting temporary output. Actual Google account acceptance remains manual.
 
 ## Experimental Python output export
 

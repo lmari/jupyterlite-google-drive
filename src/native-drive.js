@@ -90,6 +90,7 @@ export class NativeDrive {
     entry.meta = result.meta;
     return this.#dataModel(path,result.meta,result.bytes);
   }
+  listData() { return [...this.#data.keys()]; }
   get hasOutputs() { return this.#outputs.size > 0; }
   listOutputs() { return [...this.#outputs.keys()]; }
   outputSnapshot(path) {

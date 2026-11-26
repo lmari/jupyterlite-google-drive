@@ -15,6 +15,10 @@ export class GoogleAuth {
     if (!globalThis.gapi) await loadScript('https://apis.google.com/js/api.js');
     await new Promise((resolve,reject) => globalThis.gapi.load('picker', {callback: resolve, onerror: reject, timeout: 15000, ontimeout: reject}));
   }
+  get status() {
+    if (!this.#access) return 'disconnected';
+    return Date.now() >= this.#expires ? 'expired' : 'connected';
+  }
   token() {
     if (!this.#access || Date.now() >= this.#expires) throw new Error('Connect to Google Drive first (or reconnect after token expiry).');
     return this.#access;
