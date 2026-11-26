@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jupyterlite-google-drive"
+version = "0.6.0b1"
+description = "Browser-only Google Drive persistence extension for JupyterLite"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+dependencies = ["jupyterlite-core>=0.8.7,<0.9", "jupyterlite-pyodide-kernel>=0.8.7,<0.9"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Framework :: Jupyter",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: BSD License",
+]
+
+[project.urls]
+Repository = "https://github.com/lmari/jupyterlite-google-drive"
+Issues = "https://github.com/lmari/jupyterlite-google-drive/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["jupyterlite_google_drive"]
+
+[tool.hatch.build.targets.wheel.shared-data]
+"labextension" = "share/jupyter/labextensions/jupyterlite-google-drive"
