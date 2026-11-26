@@ -187,6 +187,21 @@ def main():
                             a.wait_for_timeout(200)
                         assert fake.writes >= 2, "Native save did not reach Drive"
                         assert "".join(fake.notebook["cells"][1]["source"]).strip() == "7 * 8"
+                        # Simulate a remote modification and an unsaved local edit.
+                        fake.version += 1
+                        cell.click()
+                        a.keyboard.press("Control+a")
+                        a.keyboard.insert_text("9 * 9")
+                        a.keyboard.press("Control+s")
+                        dialog(a, "Remote file changed")
+                        assert "".join(fake.notebook["cells"][1]["source"]).strip() == "7 * 8"
+                        # Recovery copies live editor contents to the default local drive.
+                        cell.click()
+                        command(a, "Save local recovery copy")
+                        dialog(a, "Local recovery copy saved")
+                        recovered = a.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
+                        expect(recovered).to_have_text("9 * 9")
+                        assert "".join(fake.notebook["cells"][1]["source"]).strip() == "7 * 8"
                         ctx_a.close()
                         ctx_b.close()
                         print("Mocked Drive round trip and stale-write rejection passed.")

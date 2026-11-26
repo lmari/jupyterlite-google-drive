@@ -55,3 +55,24 @@ test('releasing an editor does not permit account switch during pending save',as
   assert.throws(()=>d.mount('a','a.ipynb'),/progress/);
   finish();await saving;assert.equal(d.hasPendingSave,false);d.reset();
 });
+
+test('native upload tracks the actual snapshot, including edits made during the request',async()=>{
+  const fake=create();let finish;
+  const orig=fake.api.update;fake.api.update=async(...args)=>{await new Promise(r=>{finish=r;});return orig(...args);};
+  const d=new NativeDrive(fake.api),p=d.mount('a','a.ipynb');
+  await d.get(p);
+  const draft=structuredClone(nb);
+  const saving=d.save(p,{content:draft});
+  draft.metadata.changed=true;
+  finish();await saving;
+  assert.equal(d.hasUnsavedChanges(p,nb),false);
+  assert.equal(d.hasUnsavedChanges(p,draft),true);
+});
+test('failed save does not claim that newer edits were saved',async()=>{
+  const fake=create(),d=new NativeDrive(fake.api),p=d.mount('a','a.ipynb');
+  await d.get(p);await d.save(p,{content:nb});
+  fake.bump();
+  const draft={...nb,metadata:{newEdit:true}};
+  await assert.rejects(d.save(p,{content:draft}),/changed/);
+  assert.equal(d.hasUnsavedChanges(p,draft),true);
+});

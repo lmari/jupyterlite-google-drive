@@ -88,6 +88,12 @@ export class NativeDrive {
     entry.canEdit = meta.capabilities?.canEdit;
     return this.#model(path,meta,content);
   }
+  // Compare with the actual uploaded snapshot, rather than a metadata refresh
+  // or the possibly newer editor state when the request finishes.
+  hasUnsavedChanges(path, content) {
+    const entry = this.#entry(path);
+    return entry.savedSnapshot === undefined || entry.savedSnapshot !== JSON.stringify(content);
+  }
   async save(path, options = {}) {
     const entry = this.#entry(path);
     if (!entry.version || entry.canEdit === false) throw unavailable();
@@ -103,6 +109,7 @@ export class NativeDrive {
       if (!meta.version) throw new Error('Drive did not return a version; reopen before saving again.');
       entry.version = meta.version;
       entry.modified = meta.modifiedTime;
+      entry.savedSnapshot = JSON.stringify(content);
       const model = this.#model(path,{...meta,capabilities:{canEdit:entry.canEdit}});
       this.fileChanged.emit({type:'save',oldValue:null,newValue:model});
       return model;

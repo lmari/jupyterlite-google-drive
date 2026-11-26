@@ -17,3 +17,5 @@ References: https://jupyterlab.readthedocs.io/en/stable/api/interfaces/services.
 ## Experimental branch
 
 The first adapter is a session-scoped, notebook-only mount using unique local paths per remote ID and a fixed loaded version. It registers with the existing contents manager and opens via a separate experimental menu command. No deployment until native save, conflict behavior, autosave and kernel startup are verified. No checkpoints (403), and no rename/delete/create through the mounted drive. The existing import/export workflow remains available.
+
+The recovery command takes a snapshot from the current in-memory editor and saves it to a new local notebook, regardless of authorization or remote availability. The save-state guard uses the adapter's last successfully uploaded snapshot to keep a newer in-memory edit dirty. These protections are under test. Manual recovery is still required; no automatic offline journal exists.

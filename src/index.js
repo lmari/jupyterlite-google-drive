@@ -83,25 +83,38 @@ const plugin = {
     const nativeOpen = add('native-open', 'Google Drive: Open native notebook (experimental)', async () => {
       const answer = await showDialog({
         title: 'Experimental remote editor',
-        body: 'This notebook opens directly on Google Drive. Standard save and JupyterLab autosave may write remotely. Checkpoints, rename, delete and offline recovery are not implemented. Use a disposable notebook only. Close it before switching accounts.',
+        body: 'This notebook opens directly on Google Drive. Standard save and JupyterLab autosave may write remotely. Checkpoints, rename and delete are not implemented. You can make a local recovery copy without Google access. Use a disposable notebook only. Close it before switching accounts.',
         buttons: [Dialog.cancelButton(), Dialog.okButton({label:'Continue'})]
       });
       if (!answer.button.accept) return;
       const id = await auth.pick(); if (!id) return;
       const meta = await drive.metadata(id);
-      if (meta.trashed || !/\\.ipynb$/i.test(meta.name)) throw new Error('Select a non-trashed .ipynb file.');
+      if (meta.trashed || !/\.ipynb$/i.test(meta.name)) throw new Error('Select a non-trashed .ipynb file.');
       const path = native.mount(id, meta.name);
       const panel = docs.openOrReveal(native.name + ':' + path, 'Notebook');
       if (!panel) throw new Error('Could not open native notebook.');
       if (!nativePanels.has(panel)) {
         nativePanels.add(panel);
+        // JupyterLab clears dirty on successful save, even if the editor
+        // changed after the snapshot was taken. Compare to the uploaded bytes.
+        const guardDirty = (_sender, state) => {
+          if (state === 'completed' && !panel.isDisposed) {
+            if (native.hasUnsavedChanges(path, panel.context.model.toJSON())) {
+              panel.context.model.dirty = true;
+            }
+          } else if (state === 'failed' && !panel.isDisposed) {
+            panel.context.model.dirty = true;
+          }
+        };
+        panel.context.saveState.connect(guardDirty);
         panel.disposed.connect(() => {
+          panel.context.saveState.disconnect(guardDirty);
           nativePanels.delete(panel);
           native.release(path);
         });
       }
       await panel.context.ready;
-      await tell('Google Drive', 'Opened native notebook. Standard Save writes to Google Drive. For recovery, use Save a new copy or copy cells into a local notebook.');
+      await tell('Google Drive', 'Opened native notebook. Standard Save writes to Google Drive. For recovery, use Google Drive: Save local recovery copy.');
     });
     const save = add('save', 'Google Drive: Save to original', async () => {
       const panel = current(); const link = links.get(panel);
@@ -120,12 +133,23 @@ const plugin = {
       links.set(panel, {id: meta.id, name: meta.name, version: meta.version});
       await tell('Google Drive', `Created ${meta.name} in My Drive.`);
     });
+    const recover = add('recover', 'Google Drive: Save local recovery copy', async () => {
+      const panel = current();
+      await panel.context.ready;
+      // Snapshot the live model, including unsaved edits; no API call or
+      // remote credential is needed. Never overwrite an existing local file.
+      const content = structuredClone(panel.context.model.toJSON());
+      const temp = await contents.newUntitled({type:'notebook'});
+      await contents.save(temp.path,{type:'notebook',format:'json',content});
+      docs.openOrReveal(temp.path,'Notebook');
+      await tell('Google Drive', `Local recovery copy saved as ${temp.path}. The original notebook was not changed.`);
+    });
     const disconnect = add('disconnect', 'Google Drive: Disconnect', async () => {
       requireClosed();
       auth.disconnect(); links = new WeakMap(); native.reset();
       await tell('Google Drive', 'Disconnected. Local notebook copies remain in this browser.');
     });
-    menu.fileMenu.addGroup([connect, open, browse, nativeOpen, save, saveAs, disconnect], 80);
+    menu.fileMenu.addGroup([connect, open, browse, nativeOpen, save, saveAs, recover, disconnect], 80);
     // Load external scripts only if configured; connect itself remains a user gesture.
     void auth.prepare().then(() => {prepared = true;}).catch(e => {preparationError = String(e.message || e);});
   }
