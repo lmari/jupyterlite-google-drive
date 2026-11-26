@@ -1,10 +1,21 @@
 # jupyterlite-google-drive
 
-Experimental browser-only JupyterLab extension for JupyterLite. Version 0.3.0-alpha.2 (experimental mount branch). No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
+Experimental browser-only JupyterLab extension for JupyterLite. Version 0.3.0-alpha.3 (experimental output branch). No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
 
 ## Status
 
 Initial source prototype. The Drive API adapter has Node tests with mocked HTTP responses. CI build, seven unit tests, browser menu activation and Pages deployment passed in run [45866198530](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45866198530). The mocked Drive integration test also passed in [run 45867383860](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45867383860): two isolated browser contexts successfully imported the same notebook, saved an edit, rejected a stale write, and reopened the updated notebook. The project owner reported successful real Google connection after adding the account as a test user. A complete independently verified real Drive round trip is still outstanding. Not yet appropriate for production or sensitive files.
+
+## Experimental Python output export
+
+In a native Google Drive notebook with filesystem synchronization enabled, write ordinary Python files under `/drive/output/`, then choose File > Google Drive: Export Python output as new file. Confirm the selected file. The upload creates a **new** file in My Drive; no source is overwritten.
+
+```python
+from pathlib import Path
+Path("/drive/output/risultati.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+```
+
+The staging directory is shared by native notebooks within the connection and stored in memory, not in Google Drive or IndexedDB. Export needed files before reload or reconnect; reconnect/disconnect warns before discarding. Python can remove staged files. File names are restricted to safe ASCII basenames (not .ipynb). Limit: 5 MiB per file, 20 MiB total, 20 files. No folder creation or remote overwrite. Upload errors retain staged files; repeat attempts may create duplicate names if the server received the first upload but the response was lost. Browser tests use the real DriveFS bridge and a mocked Google multipart endpoint.
 
 ## Experimental mounted data access
 

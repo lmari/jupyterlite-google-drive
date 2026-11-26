@@ -135,3 +135,28 @@ test('rejects invalid data mounts, collisions and stale in-flight read after res
   finish({meta:csvMeta,bytes:Uint8Array.of(1)});
   await assert.rejects(reading,/authorization changed/);
 });
+
+test('output staging is byte-preserving, writable only in output, and cleared on reset',async()=>{
+  const d=new NativeDrive({});
+  await d.save('output/result.bin',{type:'file'});
+  await d.save('output/result.bin',{type:'file',format:'base64',content:'AP8BAg=='});
+  const m=await d.get('output/result.bin');
+  assert.equal(m.content,'AP8BAg==');assert.equal(m.size,4);assert.equal(m.writable,true);
+  const snap=d.outputSnapshot('output/result.bin');
+  await d.save('output/result.bin',{type:'file',format:'base64',content:'BAU='});
+  assert.deepEqual([...snap.bytes],[0,255,1,2]);
+  assert.deepEqual(d.listOutputs(),['output/result.bin']);
+  await assert.rejects(d.save('data/source.csv',{type:'file',content:'no'}),/not supported/);
+  await assert.rejects(d.save('output/../x',{type:'file'}),/not supported/);
+  await assert.rejects(d.save('output/a.ipynb',{type:'file'}),/not supported/);
+  await d.delete('output/result.bin');assert.equal(d.hasOutputs,false);
+  await d.save('output/a.txt',{type:'file',format:'text',content:'caffè'});
+  assert.equal((await d.get('output/a.txt')).size,6);
+  d.reset();assert.equal(d.hasOutputs,false);
+});
+test('staging refuses oversized file without changing existing snapshot',async()=>{
+  const d=new NativeDrive({});
+  await d.save('output/result.txt',{type:'file',format:'text',content:'safe'});
+  await assert.rejects(d.save('output/result.txt',{type:'file',format:'text',content:'x'.repeat(5242881)}),/5 MiB/);
+  assert.equal(new TextDecoder().decode(d.outputSnapshot('output/result.txt').bytes),'safe');
+});

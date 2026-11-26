@@ -4,6 +4,8 @@ The application bundle is real; Google Identity Services, Picker and REST
 responses are fake. No external Google account, OAuth credentials or data.
 """
 import json
+from email import policy
+from email.parser import BytesParser
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -49,6 +51,7 @@ class FakeDrive:
         self.notebook = json.loads((ROOT / "demo/notebooks/welcome.ipynb").read_text())
         self.notebook["cells"][1]["source"] = ["40 + 2"]
         self.writes = 0
+        self.created_data = []
         self.hold_next_write = False
         self.pending_write = None
         self.unavailable = False
@@ -62,7 +65,7 @@ class FakeDrive:
         req = route.request
         url = urlparse(req.url)
         cors = {"access-control-allow-origin":"*", "access-control-allow-headers":"authorization,content-type",
-                "access-control-allow-methods":"GET,PATCH,OPTIONS"}
+                "access-control-allow-methods":"GET,PATCH,POST,OPTIONS"}
         if req.method == "OPTIONS":
             route.fulfill(status=204, headers=cors)
             return
@@ -79,6 +82,14 @@ class FakeDrive:
             value = {"files":[self.metadata(), {"id":"other","name":"ignore.csv"}]}
         elif url.path == "/drive/v3/files/demo-file" and req.method == "GET":
             value = self.notebook if parse_qs(url.query).get("alt") == ["media"] else self.metadata()
+        elif url.path == "/upload/drive/v3/files" and req.method == "POST":
+            header = ("Content-Type: " + req.headers["content-type"] + "\r\nMIME-Version: 1.0\r\n\r\n").encode()
+            parts = list(BytesParser(policy=policy.default).parsebytes(header + req.post_data_buffer).iter_parts())
+            assert len(parts) == 2
+            metadata = json.loads(parts[0].get_payload(decode=True))
+            data_bytes = parts[1].get_payload(decode=True)
+            self.created_data.append((metadata["name"], data_bytes))
+            value = {"id":"new-data-" + str(len(self.created_data)), "name":metadata["name"], "version":"1"}
         elif url.path == "/upload/drive/v3/files/demo-file" and req.method == "PATCH":
             if self.hold_next_write:
                 self.hold_next_write = False

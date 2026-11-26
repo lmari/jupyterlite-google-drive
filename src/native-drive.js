@@ -1,5 +1,5 @@
 import {Signal} from '@lumino/signaling';
-import {notebookName, validateNotebook, validateDataMetadata} from './drive-api.js';
+import {notebookName, validateNotebook, validateDataMetadata, maxDataBytes} from './drive-api.js';
 
 import {dataPath, toBase64} from './kernel-data.js';
 
@@ -16,6 +16,7 @@ export class NativeDrive {
   fileChanged = new Signal(this);
   #entries = new Map();
   #data = new Map();
+  #outputs = new Map();
   #generation = 0;
   constructor(api) { this.api = api; }
 
@@ -31,6 +32,7 @@ export class NativeDrive {
     this.#generation++;
     this.#entries.clear();
     this.#data.clear();
+    this.#outputs.clear();
   }
   dispose() {
     if (this.isDisposed) return;
@@ -38,6 +40,7 @@ export class NativeDrive {
     this.#generation++;
     this.#entries.clear();
     this.#data.clear();
+    this.#outputs.clear();
     Signal.clearData(this);
   }
   mount(id, name) {
@@ -87,6 +90,40 @@ export class NativeDrive {
     entry.meta = result.meta;
     return this.#dataModel(path,result.meta,result.bytes);
   }
+  get hasOutputs() { return this.#outputs.size > 0; }
+  listOutputs() { return [...this.#outputs.keys()]; }
+  outputSnapshot(path) {
+    const entry = this.#outputs.get(path);
+    if (!entry || this.isDisposed) throw new Error('Output file is not available.');
+    return {name:path.split('/').pop(),bytes:entry.bytes.slice()};
+  }
+  #outputModel(path, entry, withContent) {
+    return {...this.#dataModel(path,{modifiedTime:entry.modified,size:entry.bytes.length,mimeType:'application/octet-stream'},
+      withContent ? entry.bytes : null),writable:true};
+  }
+  #saveOutput(path, options) {
+    if (this.isDisposed || !/^output\/[A-Za-z0-9_][A-Za-z0-9._-]{0,179}$/.test(path) ||
+        /\.ipynb$/i.test(path) || (options.type && options.type !== 'file')) throw unavailable();
+    const previous = this.#outputs.get(path);
+    let bytes;
+    if (options.content == null && !previous) bytes = new Uint8Array();
+    else if (typeof options.content === 'string' && options.format === 'base64') {
+      if (options.content.length > 4 * Math.ceil(maxDataBytes / 3)) throw new Error('Output exceeds 5 MiB.');
+      bytes = Uint8Array.from(atob(options.content),c=>c.charCodeAt(0));
+    } else if (typeof options.content === 'string' && options.format === 'text') {
+      if (options.content.length > maxDataBytes) throw new Error('Output exceeds 5 MiB.');
+      bytes = new TextEncoder().encode(options.content);
+    } else throw unavailable();
+    const total = [...this.#outputs.values()].reduce((sum,e)=>sum+e.bytes.length,0) - (previous?.bytes.length || 0) + bytes.length;
+    if (bytes.length > maxDataBytes || total > 4*maxDataBytes || (!previous && this.#outputs.size >= 20)) {
+      throw new Error('Output staging limit exceeded (5 MiB per file, 20 MiB total, 20 files).');
+    }
+    const entry = {bytes,modified:new Date().toISOString()};
+    this.#outputs.set(path,entry);
+    const model = this.#outputModel(path,entry,false);
+    this.fileChanged.emit({type:previous?'save':'new',oldValue:null,newValue:model});
+    return model;
+  }
   #entry(path) {
     const entry = this.#entries.get(path);
     if (!entry || this.isDisposed) throw new Error('Remote notebook is not mounted. Connect and reopen it from Google Drive.');
@@ -109,12 +146,19 @@ export class NativeDrive {
     if (!path || path === '/') {
       return this.#directory('',options.content === false ? null : [
         this.#directory('data',null),
+        {...this.#directory('output',null),writable:true},
         ...[...this.#entries].map(([p,e]) => this.#model(p,{modifiedTime:e.modified,capabilities:{canEdit:e.canEdit}}))
       ]);
     }
     if (path === 'data' || path === 'data/') return this.#directory('data',
       options.content === false ? null : [...this.#data].map(([p,e]) => this.#dataModel(p,e.meta)));
     if (path.startsWith('data/')) return this.#getData(path,options);
+    if (path === 'output' || path === 'output/') return {...this.#directory('output',options.content === false ? null : [...this.#outputs].map(([p,e])=>this.#outputModel(p,e,false))),writable:true};
+    if (path.startsWith('output/')) {
+      const entry = this.#outputs.get(path);
+      if (!entry || this.isDisposed) throw new Error('Output file not found.');
+      return this.#outputModel(path,entry,options.content !== false);
+    }
     const entry = this.#entry(path);
     const generation = this.#generation;
     if (options.content === false) {
@@ -139,6 +183,7 @@ export class NativeDrive {
     return entry.savedSnapshot === undefined || entry.savedSnapshot !== JSON.stringify(content);
   }
   async save(path, options = {}) {
+    if (path.startsWith('output/')) return this.#saveOutput(path,options);
     if (path === 'data' || path.startsWith('data/')) throw unavailable();
     if (options.type && options.type !== 'notebook') throw unavailable();
     const entry = this.#entry(path);
@@ -190,7 +235,12 @@ export class NativeDrive {
     await this.save(path,{content:JSON.parse(entry.checkpoint.snapshot)});
   }
   async newUntitled() { throw unavailable(); }
-  async delete() { throw unavailable(); }
+  async delete(path) {
+    const entry = this.#outputs.get(path);
+    if (!entry || this.isDisposed) throw unavailable();
+    this.#outputs.delete(path);
+    this.fileChanged.emit({type:'delete',oldValue:this.#outputModel(path,entry,false),newValue:null});
+  }
   async rename() { throw unavailable(); }
   async copy() { throw unavailable(); }
   async getDownloadUrl() { throw unavailable(); }

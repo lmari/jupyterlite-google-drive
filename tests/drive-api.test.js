@@ -83,3 +83,20 @@ test('enforces download limit even when Drive metadata does not report size',asy
   const api=new DriveAPI(()=>'fake-token',async url=>url.includes('alt=media')?new Response(new Uint8Array(5242881)):Response.json(m));
   await assert.rejects(api.readData('abc'),/5 MiB/);
 });
+
+test('creates a new binary Drive file via multipart POST, never PATCH',async()=>{
+  let request;
+  const api=new DriveAPI(()=>'fake-token',async(url,options)=>{
+    request={url,options};
+    return Response.json({id:'new-id',name:'result.bin'});
+  });
+  const result=await api.createData('result.bin',Uint8Array.of(0,255,128,65));
+  assert.equal(result.id,'new-id');assert.equal(request.options.method,'POST');
+  assert.match(request.url,/uploadType=multipart/);
+  assert.equal(request.options.headers.Authorization,'Bearer fake-token');
+  const body=new Uint8Array(await request.options.body.arrayBuffer());
+  assert.ok(body.some((v,i)=>v===0&&body[i+1]===255&&body[i+2]===128&&body[i+3]===65));
+  assert.match(new TextDecoder().decode(body),/"name":"result.bin"/);
+  await assert.rejects(api.createData('../bad',Uint8Array.of()),/Invalid/);
+  await assert.rejects(api.createData('bad.ipynb',Uint8Array.of()),/Invalid/);
+});
