@@ -24,6 +24,15 @@ const plugin = {
     const requireClosed = () => {
       if (nativePanels.size || native.hasPendingSave) throw new Error('Close all experimental Google Drive notebooks before reconnecting or disconnecting. Export unsaved work first.');
     };
+    const confirmOutputDiscard = async () => {
+      if (!native.hasOutputs) return true;
+      const answer = await showDialog({
+        title:'Discard temporary output files?',
+        body:'Files under /drive/output exist only in this browser session. Export anything you need before reconnecting or disconnecting.',
+        buttons:[Dialog.cancelButton(),Dialog.warnButton({label:'Discard'})]
+      });
+      return answer.button.accept;
+    };
     const current = () => {
       const panel = tracker.currentWidget;
       if (!panel || app.shell.currentWidget !== panel) throw new Error('Select an open notebook first.');
@@ -43,6 +52,7 @@ const plugin = {
     const connect = add('connect', 'Google Drive: Connect', async () => {
       if (!prepared) throw new Error(preparationError || 'Google libraries are loading. Retry shortly.');
       requireClosed();
+      if (!(await confirmOutputDiscard())) return;
       await auth.connect(); links = new WeakMap(); native.reset();
       await tell('Google Drive', 'Connected. Choose Open from Drive or Save a new copy to Drive.');
     });
@@ -182,12 +192,26 @@ const plugin = {
       const path = native.mountData(meta);
       await tell('Google Drive', `Mounted /drive/${path}. In a native notebook with filesystem synchronization enabled, use open("/drive/${path}", "rb"). Mounts expire on reconnect or refresh.`);
     });
+    const exportData = add('export-data', 'Google Drive: Export Python output as new file', async () => {
+      const paths = native.listOutputs();
+      if (!paths.length) throw new Error('No output files. In a native notebook with filesystem synchronization, write a file under /drive/output/ first.');
+      const result = await InputDialog.getItem({title:'Choose Python output',label:'Temporary files shared by native notebooks in this browser session',items:paths,editable:false,okLabel:'Select'});
+      if (!result.button.accept) return;
+      const {name,bytes} = native.outputSnapshot(result.value);
+      const answer = await showDialog({title:'Create new file on Google Drive?',
+        body:`Upload ${name} (${bytes.length} bytes) to My Drive? This creates a new file and never overwrites an existing Drive file. The temporary source remains available.`,
+        buttons:[Dialog.cancelButton(),Dialog.okButton({label:'Upload'})]});
+      if (!answer.button.accept) return;
+      const meta = await drive.createData(name,bytes);
+      await tell('Google Drive',`Created ${meta.name} in My Drive.`);
+    });
     const disconnect = add('disconnect', 'Google Drive: Disconnect', async () => {
       requireClosed();
+      if (!(await confirmOutputDiscard())) return;
       auth.disconnect(); links = new WeakMap(); native.reset();
       await tell('Google Drive', 'Disconnected. Local notebook copies remain in this browser.');
     });
-    menu.fileMenu.addGroup([connect, open, browse, nativeOpen, save, saveAs, recover, importData, mountData, disconnect], 80);
+    menu.fileMenu.addGroup([connect, open, browse, nativeOpen, save, saveAs, recover, importData, mountData, exportData, disconnect], 80);
     // Load external scripts only if configured; connect itself remains a user gesture.
     void auth.prepare().then(() => {prepared = true;}).catch(e => {preparationError = String(e.message || e);});
   }

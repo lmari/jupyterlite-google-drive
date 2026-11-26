@@ -61,6 +61,25 @@ def main():
                         expect(output).to_have_text("50",timeout=60000)
                         assert fake.writes==0, "Reading mounted data must not write remotely"
                         print("A second open read fresh remote bytes.")
+                        # Python writes bytes to the temporary staging directory.
+                        # No cloud upload occurs until explicit confirmation.
+                        edit_cell(page,cell,'from pathlib import Path; Path("/drive/output/result.bin").write_bytes(bytes([0,255,128,65]))')
+                        page.keyboard.press("Control+Enter")
+                        expect(output).to_have_text("4",timeout=60000)
+                        assert fake.created_data == []
+                        edit_cell(page,cell,'list(Path("/drive/output/result.bin").read_bytes())')
+                        page.keyboard.press("Control+Enter")
+                        expect(output).to_have_text("[0, 255, 128, 65]",timeout=60000)
+                        command(page,"Export Python output as new file")
+                        modal=page.locator(".jp-Dialog").filter(has_text="Choose Python output")
+                        expect(modal.locator("select option")).to_have_count(1)
+                        expect(modal.locator("select option").first).to_have_text("output/result.bin")
+                        modal.locator(".jp-Dialog-button.jp-mod-accept").click()
+                        dialog(page,"Create new file on Google Drive?")
+                        dialog(page,"Created result.bin in My Drive.")
+                        assert fake.created_data == [("result.bin",bytes([0,255,128,65]))]
+                        assert fake.writes == 0
+                        print("Python output exported as a new binary file, without overwriting Drive data.")
                         ctx.close()
                     except Exception:
                         if page and not page.is_closed():

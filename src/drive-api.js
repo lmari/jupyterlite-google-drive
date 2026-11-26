@@ -119,6 +119,24 @@ export class DriveAPI {
       method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(content)
     })).json();
   }
+  async createData(name, bytes) {
+    if (typeof name !== 'string' || !/^[A-Za-z0-9_][A-Za-z0-9._-]{0,179}$/.test(name) ||
+        /\.ipynb$/i.test(name) || !(bytes instanceof Uint8Array) || bytes.byteLength > maxDataBytes) {
+      throw new Error('Invalid output filename or data exceeds 5 MiB.');
+    }
+    const mimeType = name.toLowerCase().endsWith('.csv') ? 'text/csv' :
+      name.toLowerCase().endsWith('.json') ? 'application/json' :
+      name.toLowerCase().endsWith('.png') ? 'image/png' : 'application/octet-stream';
+    const boundary = 'data_' + globalThis.crypto.randomUUID();
+    // Blob preserves every byte; never stringify or UTF-8 decode binary data.
+    const head = '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' +
+      JSON.stringify({name,mimeType}) + '\r\n--' + boundary + '\r\nContent-Type: ' + mimeType + '\r\n\r\n';
+    const body = new Blob([head,bytes,'\r\n--' + boundary + '--\r\n']);
+    // POST always creates a new file, even if another file has the same name.
+    return (await this.request(`${upload}?uploadType=multipart&fields=id,name,version,modifiedTime,size`, {
+      method:'POST',headers:{'Content-Type':`multipart/related; boundary=${boundary}`},body
+    })).json();
+  }
   async create(name, content) {
     validateNotebook(content);
     const boundary = 'notebook_' + globalThis.crypto.randomUUID();
