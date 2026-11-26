@@ -25,3 +25,7 @@ Pyodide 0.8.7 initializes DriveFS at /drive for the drive name associated with t
 ## Alpha 3: explicit export
 
 The output/ directory on NativeDrive is a writable in-memory staging area, not a remote write-through filesystem. DriveFS create and save operations are limited to safe flat file names and bounded bytes. The browser UI chooses a snapshot, confirms, then creates a new Drive file by multipart POST. No remote data overwrite, no OAuth scope expansion, no credential in the kernel. Output survives a failed upload but not connection reset or browser reload. Tests assert binary round trip and absence of uploads before confirmation. Real Pages service-worker transport still needs verification.
+
+## Pages transport acceptance
+
+The alpha 3 isolated-browser test passed in CI run 45892804136, including byte-exact output export. Test the identical read/write/export scenario under a project URL prefix on an ordinary localhost HTTP server (secure context), without cross-origin isolation and with real service workers enabled. Require an actual controlling service worker before starting the native notebook. Preserve the SharedArrayBuffer test and the non-synchronized fallback test. Google authorization and HTTP API remain simulated; actual GitHub Pages with a real account is still a manual acceptance gate.

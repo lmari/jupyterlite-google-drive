@@ -4,6 +4,7 @@ The ordinary smoke test deliberately blocks service workers without isolation.
 This test also blocks them, but serves COOP/COEP headers so Pyodide uses its
 SharedArrayBuffer transport to the actual ContentsManager.
 """
+import argparse
 import json
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -23,6 +24,10 @@ class IsolatedHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
 def main():
+    parser=argparse.ArgumentParser()
+    parser.add_argument("--transport",choices=["shared-memory","service-worker"],default="shared-memory")
+    args=parser.parse_args()
+    service_worker=args.transport=="service-worker"
     fake=FakeDrive()
     with TemporaryDirectory() as temp:
         site=Path(temp)/"jupyterlite-google-drive"
@@ -32,7 +37,7 @@ def main():
         data.setdefault("jupyter-config-data",{}).update({
             "googleDriveClientId":"mock-client","googleDriveApiKey":"mock-key","googleDriveAppId":"123456789"})
         config.write_text(json.dumps(data))
-        with ThreadingHTTPServer(("127.0.0.1",0),partial(IsolatedHandler,directory=temp)) as server:
+        with ThreadingHTTPServer(("127.0.0.1",0),partial(SimpleHTTPRequestHandler if service_worker else IsolatedHandler,directory=temp)) as server:
             Thread(target=server.serve_forever,daemon=True).start()
             url=f"http://127.0.0.1:{server.server_port}/jupyterlite-google-drive/lab/index.html?path=welcome.ipynb"
             try:
@@ -40,8 +45,12 @@ def main():
                     browser=pw.chromium.launch()
                     page=None
                     try:
-                        ctx,page=start(browser,url,fake)
-                        assert page.evaluate("crossOriginIsolated"), "SharedArrayBuffer test requires isolation"
+                        ctx,page=start(browser,url,fake,service_workers="allow" if service_worker else "block")
+                        assert page.evaluate("crossOriginIsolated") == (not service_worker), "Unexpected cross-origin isolation status"
+                        if service_worker:
+                            # Registration alone is insufficient: the page must be controlled.
+                            page.wait_for_function("navigator.serviceWorker.controller !== null",timeout=60000)
+                        print("Testing DriveFS transport:",args.transport)
                         command(page,"Open native notebook (experimental)")
                         dialog(page,"Experimental remote editor")
                         dialog(page,"Opened native notebook")
@@ -83,7 +92,7 @@ def main():
                         ctx.close()
                     except Exception:
                         if page and not page.is_closed():
-                            page.screenshot(path=str(ROOT/"mount-failure.png"),full_page=True)
+                            page.screenshot(path=str(ROOT/("mount-failure-"+args.transport+".png")),full_page=True)
                         raise
                     finally:
                         browser.close()

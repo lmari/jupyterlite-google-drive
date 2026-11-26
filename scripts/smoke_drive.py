@@ -163,14 +163,15 @@ def browse_remote(page):
     expect(cell).to_be_visible(timeout=30000)
     return cell
 
-def start(browser, url, drive):
-    context = browser.new_context(service_workers="block")
+def start(browser, url, drive, service_workers="block"):
+    context = browser.new_context(service_workers=service_workers)
     context.add_init_script(MOCK_GOOGLE)
     context.route("https://www.googleapis.com/**", drive.handle)
     context.route("https://accounts.google.com/**", lambda route: route.abort())
     context.route("https://apis.google.com/**", lambda route: route.abort())
     page = context.new_page()
     page.on("pageerror", lambda error: print("Browser error:", error))
+    page.on("console", lambda msg: print("Filesystem:", msg.text) if "synced with Jupyter Contents" in msg.text else None)
     page.goto(url, wait_until="domcontentloaded", timeout=120000)
     expect(page.locator(".jp-Notebook:visible").first).to_be_visible(timeout=120000)
     command(page, "Connect")

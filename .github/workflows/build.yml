@@ -48,6 +48,8 @@ jobs:
         run: python scripts/smoke_drive.py
       - name: Test mounted Python data through isolated DriveFS
         run: python scripts/smoke_mount.py
+      - name: Test mounted Python data through Pages-like service worker
+        run: python scripts/smoke_mount.py --transport service-worker
       - name: Upload diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
@@ -56,7 +58,7 @@ jobs:
           path: |
             smoke-failure.png
             drive-failure-*.png
-            mount-failure.png
+            mount-failure*.png
           if-no-files-found: ignore
       - name: Inject public OAuth configuration and rebuild for deployment
         if: github.ref == 'refs/heads/main' && (vars.PAGES_ENABLED == 'true' || inputs.deploy == true)
