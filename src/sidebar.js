@@ -81,6 +81,7 @@ export class DriveSidebar extends Widget {
     }
     body.append(button('Save notebook as new Drive copy','save-as',connected&&s.hasNotebook));
     body.append(button('Save local recovery copy','recover',s.hasNotebook));
+    body.append(button('Download notebook recovery file','download-notebook',s.hasNotebook));
     section('Authorized notebooks','Only files already authorized for this app. Select additional files with Google Picker.');
     body.append(button('Refresh notebook list','refresh-list',connected));
     body.append(button('Choose notebook from Drive…','native-open',connected));
@@ -121,6 +122,7 @@ export class DriveSidebar extends Widget {
     if(!s.outputs.length)body.append(element('div','No output files.'));
     for(const path of s.outputs)body.append(element('code','/drive/'+path));
     body.append(button('Export output to Drive…','export-data',connected&&s.outputs.length>0));
+    body.append(button('Download output locally…','download-output',s.outputs.length>0));
     if(s.busy)body.append(element('div','Operation in progress…'));
     this.node.replaceChildren(body);
   }

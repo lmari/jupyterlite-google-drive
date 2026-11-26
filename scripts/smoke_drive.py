@@ -347,6 +347,16 @@ def main():
                         # Recovery copies live editor contents to the default local drive.
                         fake.unavailable = True
                         cell.click()
+                        assert a.evaluate("!window.dispatchEvent(new Event('beforeunload',{cancelable:true}))")
+                        with a.expect_download() as downloaded:
+                            command(a,"Download notebook recovery file")
+                        recovery=downloaded.value
+                        assert recovery.suggested_filename=="remote.ipynb"
+                        recovered_json=json.loads(recovery.path().read_text(encoding="utf-8"))
+                        assert "".join(recovered_json["cells"][1]["source"]).strip()=="9 * 9"
+                        assert source(fake)=="9 * 8"
+                        print("Downloaded unsaved notebook during simulated outage.")
+                        cell.click()
                         command(a, "Save local recovery copy")
                         dialog(a, "Local recovery copy saved")
                         recovered = a.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
