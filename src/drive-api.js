@@ -25,14 +25,16 @@ export function validateDataMetadata(meta) {
   return meta;
 }
 export class DriveAPI {
-  constructor(token, fetcher = globalThis.fetch.bind(globalThis)) {
-    this.token = token; this.fetcher = fetcher;
+  constructor(token, fetcher = globalThis.fetch.bind(globalThis), onUnauthorized = () => {}) {
+    this.token = token; this.fetcher = fetcher; this.onUnauthorized=onUnauthorized;
   }
   async request(url, options = {}) {
+    const token=this.token();
     const response = await this.fetcher(url, {...options, headers: {
-      ...options.headers, Authorization: 'Bearer ' + this.token()
+      ...options.headers, Authorization: 'Bearer ' + token
     }});
-    if (!response.ok) throw new Error(`Drive request failed (${response.status}). ${response.status === 401 ? 'Reconnect to Google Drive.' : ''}`);
+    if (response.status === 401) this.onUnauthorized(token);
+    if (!response.ok) throw new Error(`Drive request failed (${response.status}). ${response.status === 401 ? 'Renew Google Drive authorization.' : ''}`);
     return response;
   }
   // drive.file limits the list to files the user has authorized or the app created.

@@ -25,7 +25,7 @@ def main():
                         page.goto(url, wait_until="domcontentloaded", timeout=120000)
                         expect(page.locator(".jp-Notebook").first).to_be_visible(timeout=120000)
                         page.locator(".lm-MenuBar-item").filter(has_text="File").first.click()
-                        for label in ["Show workspace", "Connect", "Open notebook", "Browse authorized notebooks", "Open native notebook (experimental)", "Save to original", "Save a new copy", "Save local recovery copy", "Import data into Python", "Mount read-only data file (experimental)", "Export Python output as new file", "Disconnect"]:
+                        for label in ["Show workspace", "Connect", "Renew authorization", "Open notebook", "Browse authorized notebooks", "Open native notebook (experimental)", "Save to original", "Save a new copy", "Save local recovery copy", "Import data into Python", "Mount read-only data file (experimental)", "Export Python output as new file", "Disconnect"]:
                             expect(page.get_by_text("Google Drive: " + label, exact=True)).to_be_visible(timeout=30000)
                         page.get_by_text("Google Drive: Show workspace",exact=True).click()
                         workspace=page.locator("#jupyterlite-google-drive-sidebar")
@@ -33,7 +33,7 @@ def main():
                         expect(workspace.get_by_role("heading",name="Google Drive",exact=True)).to_be_visible()
                         expect(workspace.get_by_role("status")).to_contain_text("Configuration unavailable",timeout=30000)
                         expect(workspace.get_by_role("button",name="Connect to Google Drive")).to_be_disabled()
-                        print("JupyterLite notebook and twelve Drive menu commands are visible.")
+                        print("JupyterLite notebook and thirteen Drive menu commands are visible.")
                     except Exception:
                         page.screenshot(path=str(root / "smoke-failure.png"), full_page=True)
                         raise

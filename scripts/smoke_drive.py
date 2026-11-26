@@ -20,7 +20,7 @@ MOCK_GOOGLE = """
 (() => {
   class Builder {
     addView() { return this; }
-    setOAuthToken(t) { if (t !== 'mock-token') throw Error('Wrong token'); return this; }
+    setOAuthToken(t) { if (!['mock-token','renewed-token'].includes(t)) throw Error('Wrong token'); return this; }
     setDeveloperKey() { return this; }
     setAppId() { return this; }
     setOrigin() { return this; }
@@ -30,7 +30,7 @@ MOCK_GOOGLE = """
   window.google = {
     accounts: {oauth2: {
       initTokenClient: opts => ({
-        requestAccessToken: () => opts.callback({access_token:'mock-token',expires_in:3600})
+        requestAccessToken: () => opts.callback({access_token:window.__driveAuthToken || 'mock-token',expires_in:3600})
       }),
       hasGrantedAllScopes: () => true,
       revoke: (token, cb) => cb({})
@@ -55,6 +55,7 @@ class FakeDrive:
         self.hold_next_write = False
         self.pending_write = None
         self.unavailable = False
+        self.expire_original_token = False
         self.csv_data = "x,y\n2,3\n4,5\n"
 
     def metadata(self):
@@ -69,7 +70,17 @@ class FakeDrive:
         if req.method == "OPTIONS":
             route.fulfill(status=204, headers=cors)
             return
-        assert req.headers.get("authorization") == "Bearer mock-token"
+        token=req.headers.get("authorization")
+        if url.path == "/drive/v3/about":
+            if token not in ["Bearer mock-token","Bearer renewed-token","Bearer other-token"]:
+                route.fulfill(status=401,headers=cors,json={"error":"unknown token"})
+                return
+            route.fulfill(status=200,headers=cors,json={"user":{"permissionId":"other-account" if token=="Bearer other-token" else "original-account"}})
+            return
+        assert token in ["Bearer mock-token","Bearer renewed-token"], "Unverified account used for Drive access"
+        if self.expire_original_token and token == "Bearer mock-token":
+            route.fulfill(status=401,headers=cors,json={"error":"expired token"})
+            return
         if self.unavailable:
             route.fulfill(status=503, headers=cors, json={"error":"simulated outage"})
             return

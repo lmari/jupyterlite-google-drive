@@ -59,7 +59,8 @@ export class DriveSidebar extends Widget {
       return b;
     };
     const connected=s.auth==='connected';
-    body.append(button(connected?'Reconnect / switch account':'Connect to Google Drive','connect',s.prepared));
+    if(s.hasAccount) body.append(button('Renew authorization','renew',s.prepared));
+    body.append(button(s.hasAccount?'Switch Google account':'Connect to Google Drive','connect',s.prepared));
     body.append(button('Disconnect from Google Drive','disconnect',s.auth!=='disconnected'));
     const section=(title,desc)=>{
       const h=element('h3',title);h.style.margin='12px 0 0';
@@ -100,7 +101,7 @@ export class DriveSidebar extends Widget {
     body.append(button('Import temporary data copy…','import-data',connected&&s.hasNotebook));
     if(!s.data.length)body.append(element('div','No mounted data.'));
     for(const path of s.data)body.append(element('code','/drive/'+path));
-    section('Python output','Temporary files under /drive/output/. Export before reconnecting or reloading.');
+    section('Python output','Temporary files under /drive/output/. Export before switching accounts or reloading.');
     if(!s.outputs.length)body.append(element('div','No output files.'));
     for(const path of s.outputs)body.append(element('code','/drive/'+path));
     body.append(button('Export output to Drive…','export-data',connected&&s.outputs.length>0));

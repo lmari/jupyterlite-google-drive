@@ -7,8 +7,8 @@ function loadScript(url) {
   });
 }
 export class GoogleAuth {
-  #access = null; #expires = 0; #pending = false;
-  constructor(config) { this.config = config; }
+  #access = null; #expires = 0; #pending = false; #account = null;
+  constructor(config, fetcher = globalThis.fetch.bind(globalThis)) { this.config = config; this.fetcher = fetcher; }
   async prepare() {
     if (!this.config.clientId || !this.config.apiKey || !this.config.appId) throw new Error('Google Cloud configuration is missing. See README.');
     if (!globalThis.google?.accounts?.oauth2) await loadScript('https://accounts.google.com/gsi/client');
@@ -23,27 +23,58 @@ export class GoogleAuth {
     if (!this.#access || Date.now() >= this.#expires) throw new Error('Connect to Google Drive first (or reconnect after token expiry).');
     return this.#access;
   }
-  connect() {
+  get hasAccount() { return this.#account !== null; }
+  invalidate(token) {
+    if (token === this.#access) this.#expires = 0;
+  }
+  async #identify(token) {
+    const response = await this.fetcher('https://www.googleapis.com/drive/v3/about?fields=user(permissionId)',{
+      headers:{Authorization:'Bearer '+token},cache:'no-store'
+    });
+    if (!response.ok) throw new Error('Cannot verify Google Drive account. Authorization was not changed.');
+    const data=await response.json();
+    const id=data?.user?.permissionId;
+    if (typeof id!=='string' || !id.trim()) throw new Error('Google Drive did not identify the account. Authorization was not changed.');
+    return id;
+  }
+  connect() { return this.#authorize(false); }
+  renew() {
+    if (!this.#account) return Promise.reject(new Error('Connect to Google Drive first.'));
+    return this.#authorize(true);
+  }
+  #authorize(sameAccount) {
     if (this.#pending) return Promise.reject(new Error('Authorization already in progress.'));
     this.#pending = true;
+    const previousAccount=this.#account;
     return new Promise((resolve, reject) => {
-      const fail = () => reject(new Error('Google authorization was cancelled or failed.'));
+      let handled=false;
+      const fail = () => { if (!handled) { handled=true; reject(new Error('Google authorization was cancelled or failed.')); } };
       try {
         const client = globalThis.google.accounts.oauth2.initTokenClient({
           client_id: this.config.clientId, scope, include_granted_scopes: false,
-          callback: response => {
+          callback: async response => {
+            if (handled) return;
             if (response.error || !response.access_token || !globalThis.google.accounts.oauth2.hasGrantedAllScopes(response, scope)) return fail();
-            this.#access = response.access_token;
-            this.#expires = Date.now() + Math.max(0, Number(response.expires_in) - 30) * 1000;
-            resolve();
+            handled=true;
+            const candidate=response.access_token;
+            const expires=Date.now()+Math.max(0,Number(response.expires_in)-30)*1000;
+            try {
+              if (!Number.isFinite(expires) || expires<=Date.now()) throw new Error('Google returned an expired authorization.');
+              const account=await this.#identify(candidate);
+              if (sameAccount && account!==previousAccount) throw new Error('Different Google account selected. The existing workspace was preserved. Renew with the original account.');
+              if (expires<=Date.now()) throw new Error('Authorization expired during account verification.');
+              this.#access=candidate; this.#expires=expires; this.#account=account;
+              resolve();
+            } catch(e) { reject(e); }
           }, error_callback: fail
         });
-        client.requestAccessToken({prompt: 'select_account'});
-      } catch (e) { reject(e); }
+        client.requestAccessToken({prompt:'select_account'});
+      } catch (e) { handled=true; reject(e); }
     }).finally(() => { this.#pending = false; });
   }
   disconnect() {
-    const token = this.#access; this.#access = null; this.#expires = 0;
+    if (this.#pending) throw new Error('Authorization already in progress.');
+    const token = this.#access; this.#access = null; this.#expires = 0; this.#account=null;
     if (token) globalThis.google.accounts.oauth2.revoke(token, () => {});
   }
   pick() {
