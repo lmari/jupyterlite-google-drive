@@ -45,6 +45,7 @@ def main():
     assert (DIST / "lab" / "index.html").is_file()
     assert (DIST / "extensions" / NAME / remote).is_file(), "Extension not included in site"
     assert (DIST / "files" / "welcome.ipynb").is_file(), "Demo notebook not included"
+    assert (DIST / "files" / "primi-passi.ipynb").is_file(), "Student guide not included"
     print("Static demo verified:", DIST)
 
 if __name__ == "__main__":
