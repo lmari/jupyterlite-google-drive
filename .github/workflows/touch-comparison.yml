@@ -1,0 +1,63 @@
+name: Compare tablet touch menus
+
+on:
+  pull_request:
+    paths:
+      - 'requirements-build.txt'
+      - 'package.json'
+      - 'src/**'
+      - 'scripts/smoke_touch.py'
+      - '.github/workflows/touch-comparison.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    name: Touch menus - ${{ matrix.runtime }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [baseline, candidate]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.runtime == 'baseline' && '3ba8723bf5ce5e81a468cb48d204f8e9bdcc9e9f' || github.event.pull_request.head.sha }}
+          path: runtime
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime dependencies
+        working-directory: runtime
+        run: |
+          python -m pip install -r requirements-build.txt
+          npm install
+      - name: Build unconfigured runtime
+        working-directory: runtime
+        run: python scripts/build_demo.py
+      - name: Install touch-capable browser engines
+        run: python -m playwright install --with-deps chromium firefox
+      - name: Compare touch behavior
+        id: touch
+        continue-on-error: ${{ matrix.runtime == 'baseline' }}
+        run: python scripts/smoke_touch.py --site runtime/dist --diagnostics touch-diagnostics
+      - name: Record actual touch test outcome
+        if: always()
+        run: |
+          echo "Runtime: ${{ matrix.runtime }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Touch test outcome: ${{ steps.touch.outcome }}" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f touch-diagnostics/touch-results.json ]; then
+            cat touch-diagnostics/touch-results.json >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: touch-${{ matrix.runtime }}
+          path: touch-diagnostics/
+          if-no-files-found: ignore
