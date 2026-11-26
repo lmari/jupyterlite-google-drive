@@ -1,6 +1,6 @@
 # jupyterlite-google-drive
 
-Experimental browser-only JupyterLab extension for JupyterLite. Version 0.4.0-alpha.2. No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
+Experimental browser-only JupyterLab extension for JupyterLite. Version 0.4.0-alpha.3. No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
 
 ## Status
 
@@ -8,7 +8,11 @@ Initial source prototype. The Drive API adapter has Node tests with mocked HTTP 
 
 ## Google Drive workspace (0.4 alpha)
 
-Open File > Google Drive: Show workspace or the Drive tab in the left sidebar. The panel reports authorization state (not network health), the latest observed notebook save status (loading, loaded, saving, unsaved, acknowledged, read-only or failed), the current notebook's persistence mode, authorized notebooks after explicit refresh, mounted data paths and temporary output paths. Open an already-authorized notebook directly in the native editor, or use Picker to select another file. All existing File menu commands remain available. Native Save status refers to the current editor's acknowledged snapshot, not proof of global synchronization. A newer edit during upload remains unsaved. A remote save failure offers local recovery. Saving a new Drive copy of a native notebook does not change the original backing file. No extra OAuth scopes, persistent credentials, folder tree, or changes to remote save semantics. The authorization status updates on expiry; reconnect still requires closing native editors and exporting temporary output. Actual Google account acceptance remains manual.
+Open File > Google Drive: Show workspace or the Drive tab in the left sidebar. The panel reports authorization state (not network health), the latest observed notebook save status (loading, loaded, saving, unsaved, acknowledged, read-only or failed), the current notebook's persistence mode, authorized notebooks after explicit refresh, mounted data paths and temporary output paths. Open an already-authorized notebook directly in the native editor, or use Picker to select another file. All existing File menu commands remain available. Native Save status refers to the current editor's acknowledged snapshot, not proof of global synchronization. A newer edit during upload remains unsaved. A remote save failure offers local recovery. Saving a new Drive copy of a native notebook does not change the original backing file. No extra OAuth scopes, persistent credentials, folder tree, or changes to remote save semantics. The authorization status updates on expiry; Renew authorization verifies the original account via Drive about.get and preserves native editors, mounted data and staged outputs. Switching accounts or disconnecting still requires closing native editors and confirming discard of temporary output. Actual Google account acceptance remains manual.
+
+### Renewal without closing notebooks
+
+Use File > Google Drive: Renew authorization (also in the sidebar). Choose the original Google account. The candidate token is checked against the current Drive permission ID before use; a different account is rejected without changing the workspace. A 401 marks authorization expired; retry failed saves explicitly after renewal. No additional OAuth scope, no refresh token, no automatic remote retry. This is still experimental until real Google account verification.
 
 ## Experimental Python output export
 
