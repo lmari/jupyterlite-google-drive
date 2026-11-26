@@ -30,7 +30,7 @@ test('native paths are invalid after reconnect, unsupported operations fail clos
   const fake=create(), d=new NativeDrive(fake.api), p=d.mount('a','a.ipynb');
   await d.get(p);d.reset();
   await assert.rejects(d.save(p,{content:nb}),/not mounted/);
-  await assert.rejects(d.createCheckpoint(p),e=>e.response.status===403);
+  await assert.rejects(d.createCheckpoint(p),/not mounted/);
   await assert.rejects(d.delete(p),e=>e.response.status===403);
   assert.equal(fake.writes(),0);
 });
@@ -75,4 +75,33 @@ test('failed save does not claim that newer edits were saved',async()=>{
   const draft={...nb,metadata:{newEdit:true}};
   await assert.rejects(d.save(p,{content:draft}),/changed/);
   assert.equal(d.hasUnsavedChanges(p,draft),true);
+});
+
+test('native checkpoints snapshot last persisted content, not live edits, without a remote write',async()=>{
+  const fake=create(),d=new NativeDrive(fake.api),p=d.mount('a','a.ipynb');
+  await d.get(p);
+  assert.deepEqual(await d.listCheckpoints(p),[]);
+  const cp=await d.createCheckpoint(p);
+  assert.deepEqual(await d.listCheckpoints(p),[cp]);
+  assert.equal(fake.writes(),0);
+  const draft={...nb,metadata:{edit:true}};
+  await d.save(p,{content:draft});
+  assert.equal(fake.writes(),1);
+  await d.restoreCheckpoint(p,cp.id);
+  assert.equal(fake.writes(),2);
+  assert.equal(d.hasUnsavedChanges(p,nb),false);
+  assert.equal(d.hasUnsavedChanges(p,draft),true);
+  await d.deleteCheckpoint(p,cp.id);
+  assert.deepEqual(await d.listCheckpoints(p),[]);
+});
+test('checkpoint restore refuses a stale remote version and checkpoints expire with the handle',async()=>{
+  const fake=create(),d=new NativeDrive(fake.api),p=d.mount('a','a.ipynb');
+  await d.get(p);
+  const cp=await d.createCheckpoint(p);
+  fake.bump();
+  await assert.rejects(d.restoreCheckpoint(p,cp.id),/changed/);
+  assert.equal(fake.writes(),0);
+  d.release(p);
+  const next=d.mount('a','a.ipynb');await d.get(next);
+  assert.deepEqual(await d.listCheckpoints(next),[]);
 });

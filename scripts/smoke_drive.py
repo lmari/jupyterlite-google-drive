@@ -187,6 +187,7 @@ def main():
                             a.wait_for_timeout(200)
                         assert fake.writes >= 2, "Native save did not reach Drive"
                         assert "".join(fake.notebook["cells"][1]["source"]).strip() == "7 * 8"
+                        print("Native Ctrl+S persisted the code cell.")
                         # Exercise the real Pyodide kernel, not just the editor.
                         cell.click()
                         a.keyboard.press("Control+Enter")
@@ -201,13 +202,19 @@ def main():
                         else:
                             raise AssertionError("Executed Python output did not persist on simulated Drive")
 
+                        print("Pyodide executed the native notebook and its output persisted.")
                         # Simulate a remote modification and an unsaved local edit.
                         fake.version += 1
                         cell.click()
                         a.keyboard.press("Control+a")
                         a.keyboard.insert_text("9 * 9")
                         a.keyboard.press("Control+s")
-                        dialog(a, "Remote file changed")
+                        # JupyterLab's built-in error dialog has a Close (cancel)
+                        # button, unlike our own OK/accept dialogs.
+                        modal = a.locator(".jp-Dialog").last
+                        expect(modal).to_contain_text("Remote file changed", timeout=30000)
+                        modal.get_by_role("button", name="Close", exact=True).click()
+                        expect(modal).to_be_hidden()
                         assert "".join(fake.notebook["cells"][1]["source"]).strip() == "7 * 8"
                         # Recovery copies live editor contents to the default local drive.
                         cell.click()

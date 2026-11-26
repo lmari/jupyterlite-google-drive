@@ -83,7 +83,7 @@ const plugin = {
     const nativeOpen = add('native-open', 'Google Drive: Open native notebook (experimental)', async () => {
       const answer = await showDialog({
         title: 'Experimental remote editor',
-        body: 'This notebook opens directly on Google Drive. Standard save and JupyterLab autosave may write remotely. Checkpoints, rename and delete are not implemented. You can make a local recovery copy without Google access. Use a disposable notebook only. Close it before switching accounts.',
+        body: 'This notebook opens directly on Google Drive. Standard save and JupyterLab autosave may write remotely. Checkpoints are available only in the current editor session; rename and delete are not implemented. You can make a local recovery copy without Google access. Use a disposable notebook only. Close it before switching accounts.',
         buttons: [Dialog.cancelButton(), Dialog.okButton({label:'Continue'})]
       });
       if (!answer.button.accept) return;

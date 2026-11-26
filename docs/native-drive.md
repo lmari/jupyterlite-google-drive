@@ -16,6 +16,8 @@ References: https://jupyterlab.readthedocs.io/en/stable/api/interfaces/services.
 
 ## Experimental branch
 
-The first adapter is a session-scoped, notebook-only mount using unique local paths per remote ID and a fixed loaded version. It registers with the existing contents manager and opens via a separate experimental menu command. No deployment until native save, conflict behavior, autosave and kernel startup are verified. No checkpoints (403), and no rename/delete/create through the mounted drive. The existing import/export workflow remains available.
+The first adapter is a session-scoped, notebook-only mount using unique local paths per remote ID and a fixed loaded version. It registers with the existing contents manager and opens via a separate experimental menu command. No deployment until native save, conflict behavior, autosave and kernel startup are verified. One session-only checkpoint per notebook, no persistent history, and no rename/delete/create through the mounted drive. The existing import/export workflow remains available.
 
 The recovery command takes a snapshot from the current in-memory editor and saves it to a new local notebook, regardless of authorization or remote availability. The save-state guard uses the adapter's last successfully uploaded snapshot to keep a newer in-memory edit dirty. These protections are under test. Manual recovery is still required; no automatic offline journal exists.
+
+JupyterLab 4.6 invokes createCheckpoint after its standard Save command. Returning 403 there produced an unhandled error even when the file itself saved successfully. The experimental adapter therefore stores an actual checkpoint of the last uploaded or loaded snapshot in memory, with no second upload. Explicit restore is version-guarded; the checkpoint is not a permanent Drive revision and is discarded when the editor closes.

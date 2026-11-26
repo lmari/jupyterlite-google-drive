@@ -86,6 +86,7 @@ export class NativeDrive {
     entry.version = meta.version;
     entry.modified = meta.modifiedTime;
     entry.canEdit = meta.capabilities?.canEdit;
+    entry.savedSnapshot = JSON.stringify(content);
     return this.#model(path,meta,content);
   }
   // Compare with the actual uploaded snapshot, rather than a metadata refresh
@@ -118,11 +119,31 @@ export class NativeDrive {
       if (entry.released) this.#entries.delete(path);
     }
   }
-  async listCheckpoints() { return []; }
-  // JupyterLab context treats HTTP 403 as an unavailable checkpoint.
-  async createCheckpoint() { throw unavailable(); }
-  async deleteCheckpoint() { throw unavailable(); }
-  async restoreCheckpoint() { throw unavailable(); }
+  // JupyterLab's normal Save command also creates a checkpoint.
+  // Keep one real, session-only checkpoint of the last persisted content.
+  // Creating it does not trigger a second network write.
+  async listCheckpoints(path) {
+    const entry = this.#entry(path);
+    return entry.checkpoint ? [{...entry.checkpoint.model}] : [];
+  }
+  async createCheckpoint(path) {
+    const entry = this.#entry(path);
+    if (!entry.version || entry.savedSnapshot === undefined || entry.canEdit === false || entry.busy) throw unavailable();
+    const model = {id:'session',last_modified:new Date().toISOString()};
+    entry.checkpoint = {model, snapshot:entry.savedSnapshot};
+    return {...model};
+  }
+  async deleteCheckpoint(path, id) {
+    const entry = this.#entry(path);
+    if (entry.checkpoint?.model.id !== id || entry.busy) throw unavailable();
+    delete entry.checkpoint;
+  }
+  async restoreCheckpoint(path, id) {
+    const entry = this.#entry(path);
+    if (entry.checkpoint?.model.id !== id) throw unavailable();
+    // An explicit restore is a remote write, with the same version guard as Save.
+    await this.save(path,{content:JSON.parse(entry.checkpoint.snapshot)});
+  }
   async newUntitled() { throw unavailable(); }
   async delete() { throw unavailable(); }
   async rename() { throw unavailable(); }
