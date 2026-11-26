@@ -124,8 +124,11 @@ def command(page, label):
     page.get_by_text("Google Drive: " + label, exact=True).click()
 
 def dialog(page, message):
-    modal = page.locator(".jp-Dialog").last
-    expect(modal).to_contain_text(message, timeout=30000)
+    # Match the expected dialog, not a moving .last locator: the next
+    # dialog may already be visible when the previous one is dismissed.
+    modal = page.locator(".jp-Dialog").filter(has_text=message)
+    expect(modal).to_have_count(1, timeout=30000)
+    expect(modal).to_be_visible()
     modal.locator(".jp-Dialog-button.jp-mod-accept").click()
     expect(modal).to_be_hidden()
 
@@ -138,8 +141,9 @@ def open_remote(page):
 
 def browse_remote(page):
     command(page, "Browse authorized notebooks")
-    modal = page.locator(".jp-Dialog").last
-    expect(modal).to_contain_text("Authorized Google Drive notebooks", timeout=30000)
+    modal = page.locator(".jp-Dialog").filter(has_text="Authorized Google Drive notebooks")
+    expect(modal).to_have_count(1, timeout=30000)
+    expect(modal).to_be_visible()
     expect(modal.locator("select option")).to_have_count(1)
     expect(modal.locator("select option").first).to_contain_text("remote.ipynb")
     modal.locator(".jp-Dialog-button.jp-mod-accept").click()
@@ -296,8 +300,9 @@ def main():
                         a.keyboard.press("Control+s")
                         # JupyterLab's built-in error dialog has a Close (cancel)
                         # button, unlike our own OK/accept dialogs.
-                        modal = a.locator(".jp-Dialog").last
-                        expect(modal).to_contain_text("Remote file changed", timeout=30000)
+                        modal = a.locator(".jp-Dialog").filter(has_text="Remote file changed")
+                        expect(modal).to_have_count(1, timeout=30000)
+                        expect(modal).to_be_visible()
                         modal.get_by_role("button", name="Close", exact=True).click()
                         expect(modal).to_be_hidden()
                         assert source(fake) == "9 * 8"
