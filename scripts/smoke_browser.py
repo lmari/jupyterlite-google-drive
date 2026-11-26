@@ -47,8 +47,17 @@ def main():
                         expect(workspace.get_by_role("button",name="Save local recovery copy")).to_be_visible()
                         advanced.locator("summary").click()
                         expect(workspace.get_by_role("button",name="Import temporary data copy…")).to_be_hidden()
+                        if args.site == "wheel-demo":
+                            # Prove the installed environment actually executes Python.
+                            cell=page.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
+                            cell.click()
+                            page.keyboard.press("Control+Enter")
+                            output=page.locator(".jp-Notebook:visible .jp-CodeCell .jp-OutputArea-output").first
+                            expect(output).to_have_text("6",timeout=180000)
+                            print("Installed wheel site executed the real Python kernel.")
                         print("JupyterLite notebook, nineteen commands and collapsible advanced actions are verified.")
                     except Exception:
+                        print("Visible JupyterLab dialogs:",page.locator(".jp-Dialog:visible").all_text_contents())
                         page.screenshot(path=str(root / "smoke-failure.png"), full_page=True)
                         raise
                     finally:
