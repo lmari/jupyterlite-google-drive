@@ -1,10 +1,14 @@
 # jupyterlite-google-drive
 
-Experimental browser-only JupyterLab extension for JupyterLite. Version 0.2.0-alpha.1. No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
+Experimental browser-only JupyterLab extension for JupyterLite. Version 0.2.0-alpha.2 (experimental branch). No fork of JupyterLite, no backend. Target: JupyterLite 0.8 / JupyterLab 4.6.
 
 ## Status
 
 Initial source prototype. The Drive API adapter has Node tests with mocked HTTP responses. CI build, seven unit tests, browser menu activation and Pages deployment passed in run [45866198530](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45866198530). The mocked Drive integration test also passed in [run 45867383860](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45867383860): two isolated browser contexts successfully imported the same notebook, saved an edit, rejected a stale write, and reopened the updated notebook. The project owner reported successful real Google connection after adding the account as a test user. A complete independently verified real Drive round trip is still outstanding. Not yet appropriate for production or sensitive files.
+
+## Experimental native mount
+
+The new command Google Drive: Open native notebook (experimental) opens a selected disposable notebook on a separate Contents.IDrive mount. Standard JupyterLab save may write directly to Google Drive; JupyterLab's normal autosave may also apply. This branch is not deployed. Remote paths are session-only, not a persistent filesystem; no full sidebar, rename/delete, checkpoint, local recovery integration, or kernel filesystem compatibility is promised. Reconnect/disconnect is blocked while native panels are open. Metadata refresh cannot silently adopt a changed remote version. Use the existing import/export commands for regular work. CI now attempts a native editor Ctrl+S round trip with fake Google services; actual kernel execution, dirty-state handling during writes, and real Drive must be checked before release.
 
 ## Workflow
 

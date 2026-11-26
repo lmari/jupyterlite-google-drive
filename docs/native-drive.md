@@ -13,3 +13,7 @@ The existing import/export path remains a safe fallback. The first 0.2 alpha add
 - Enable autosave only after explicit save is verified to keep correct dirty state and safely handle conflicts. Test real Drive and two independent contexts, including duplicate names, token expiry, account switch, and edits during save. Test a real Python cell in the mounted notebook.
 
 References: https://jupyterlab.readthedocs.io/en/stable/api/interfaces/services.Contents.IDrive.html ; https://jupyterlab.readthedocs.io/en/latest/extension/extension_points.html ; https://jupyterlite.readthedocs.io/en/stable/migration.html .
+
+## Experimental branch
+
+The first adapter is a session-scoped, notebook-only mount using unique local paths per remote ID and a fixed loaded version. It registers with the existing contents manager and opens via a separate experimental menu command. No deployment until native save, conflict behavior, autosave and kernel startup are verified. No checkpoints (403), and no rename/delete/create through the mounted drive. The existing import/export workflow remains available.

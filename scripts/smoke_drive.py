@@ -169,6 +169,24 @@ def main():
                         # Reopen from simulated Drive on the other browser.
                         cell_b = browse_remote(b)
                         expect(cell_b).to_have_text("6 * 7")
+                        # Experimental native mount uses the real JupyterLab
+                        # document manager and standard Save, not the import command.
+                        command(a, "Open native notebook (experimental)")
+                        dialog(a, "Experimental remote editor")
+                        dialog(a, "Opened native notebook")
+                        cell = a.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
+                        expect(cell).to_have_text("6 * 7")
+                        cell.click()
+                        a.keyboard.press("Control+a")
+                        a.keyboard.insert_text("7 * 8")
+                        expect(cell).to_have_text("7 * 8")
+                        a.keyboard.press("Control+s")
+                        for _ in range(100):
+                            if fake.writes >= 2:
+                                break
+                            a.wait_for_timeout(200)
+                        assert fake.writes >= 2, "Native save did not reach Drive"
+                        assert "".join(fake.notebook["cells"][1]["source"]).strip() == "7 * 8"
                         ctx_a.close()
                         ctx_b.close()
                         print("Mocked Drive round trip and stale-write rejection passed.")

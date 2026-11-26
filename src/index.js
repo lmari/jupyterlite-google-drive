@@ -5,6 +5,7 @@ import {IMainMenu} from '@jupyterlab/mainmenu';
 import {INotebookTracker} from '@jupyterlab/notebook';
 import {GoogleAuth} from './auth.js';
 import {DriveAPI, notebookName} from './drive-api.js';
+import {NativeDrive} from './native-drive.js';
 
 const plugin = {
   id: 'jupyterlite-google-drive:plugin', autoStart: true,
@@ -16,6 +17,12 @@ const plugin = {
     let links = new WeakMap(); let busy = false; let prepared = false; let preparationError = '';
     const tell = (title, body) => showDialog({title, body, buttons: [Dialog.okButton()]});
     const contents = app.serviceManager.contents;
+    const native = new NativeDrive(drive);
+    contents.addDrive(native);
+    const nativePanels = new Set();
+    const requireClosed = () => {
+      if (nativePanels.size) throw new Error('Close all experimental Google Drive notebooks before reconnecting or disconnecting. Export unsaved work first.');
+    };
     const current = () => {
       const panel = tracker.currentWidget;
       if (!panel || app.shell.currentWidget !== panel) throw new Error('Select an open notebook first.');
@@ -34,7 +41,8 @@ const plugin = {
     };
     const connect = add('connect', 'Google Drive: Connect', async () => {
       if (!prepared) throw new Error(preparationError || 'Google libraries are loading. Retry shortly.');
-      await auth.connect(); links = new WeakMap();
+      requireClosed();
+      await auth.connect(); links = new WeakMap(); native.reset();
       await tell('Google Drive', 'Connected. Choose Open from Drive or Save a new copy to Drive.');
     });
     const openRemote = async id => {
@@ -72,6 +80,24 @@ const plugin = {
       const selected = files[items.indexOf(result.value)];
       if (selected) await openRemote(selected.id);
     });
+    const nativeOpen = add('native-open', 'Google Drive: Open native notebook (experimental)', async () => {
+      const answer = await showDialog({
+        title: 'Experimental remote editor',
+        body: 'This notebook opens directly on Google Drive. Standard save and JupyterLab autosave may write remotely. Checkpoints, rename, delete and offline recovery are not implemented. Use a disposable notebook only. Close it before switching accounts.',
+        buttons: [Dialog.cancelButton(), Dialog.okButton({label:'Continue'})]
+      });
+      if (!answer.button.accept) return;
+      const id = await auth.pick(); if (!id) return;
+      const meta = await drive.metadata(id);
+      if (meta.trashed || !/\\.ipynb$/i.test(meta.name)) throw new Error('Select a non-trashed .ipynb file.');
+      const path = native.mount(id, meta.name);
+      const panel = docs.openOrReveal(native.name + ':' + path, 'Notebook');
+      if (!panel) throw new Error('Could not open native notebook.');
+      nativePanels.add(panel);
+      panel.disposed.connect(() => nativePanels.delete(panel));
+      await panel.context.ready;
+      await tell('Google Drive', 'Opened native notebook. Standard Save writes to Google Drive. For recovery, use Save a new copy or copy cells into a local notebook.');
+    });
     const save = add('save', 'Google Drive: Save to original', async () => {
       const panel = current(); const link = links.get(panel);
       if (!link) throw new Error('No remote link for this notebook. Reopen from Drive or save a new copy.');
@@ -90,10 +116,11 @@ const plugin = {
       await tell('Google Drive', `Created ${meta.name} in My Drive.`);
     });
     const disconnect = add('disconnect', 'Google Drive: Disconnect', async () => {
-      auth.disconnect(); links = new WeakMap();
+      requireClosed();
+      auth.disconnect(); links = new WeakMap(); native.reset();
       await tell('Google Drive', 'Disconnected. Local notebook copies remain in this browser.');
     });
-    menu.fileMenu.addGroup([connect, open, browse, save, saveAs, disconnect], 80);
+    menu.fileMenu.addGroup([connect, open, browse, nativeOpen, save, saveAs, disconnect], 80);
     // Load external scripts only if configured; connect itself remains a user gesture.
     void auth.prepare().then(() => {prepared = true;}).catch(e => {preparationError = String(e.message || e);});
   }
