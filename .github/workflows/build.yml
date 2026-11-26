@@ -1,0 +1,86 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Publish the tested demo to GitHub Pages
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build dependencies
+        run: |
+          python -m pip install -r requirements-build.txt
+          npm install
+      - name: Check JavaScript and run unit tests
+        run: |
+          npm run check
+          npm test
+      - name: Build unconfigured demo
+        run: python scripts/build_demo.py
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Test menu activation in browser
+        run: python scripts/smoke_browser.py
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-diagnostics
+          path: smoke-failure.png
+          if-no-files-found: ignore
+      - name: Inject public OAuth configuration and rebuild for deployment
+        if: github.ref == 'refs/heads/main' && (vars.PAGES_ENABLED == 'true' || inputs.deploy == true)
+        env:
+          GOOGLE_DRIVE_CLIENT_ID: ${{ vars.GOOGLE_DRIVE_CLIENT_ID }}
+          GOOGLE_DRIVE_API_KEY: ${{ vars.GOOGLE_DRIVE_API_KEY }}
+          GOOGLE_DRIVE_APP_ID: ${{ vars.GOOGLE_DRIVE_APP_ID }}
+        run: python scripts/build_demo.py
+      - name: Upload static demo artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jupyterlite-demo
+          path: dist/
+      - name: Upload Pages artifact
+        if: github.ref == 'refs/heads/main' && (vars.PAGES_ENABLED == 'true' || inputs.deploy == true)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main' && (vars.PAGES_ENABLED == 'true' || inputs.deploy == true)
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - uses: actions/deploy-pages@v4
+        id: deployment

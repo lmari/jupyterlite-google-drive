@@ -5,3 +5,4 @@ labextension/
 dist/
 demo/jupyter-lite.json
 __pycache__/
+smoke-failure.png

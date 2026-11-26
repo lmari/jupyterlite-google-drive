@@ -1,0 +1,5 @@
+jupyterlab>=4.6,<4.7
+jupyterlite-core>=0.8,<0.9
+jupyterlite-pyodide-kernel>=0.8,<0.9
+jupyter-builder>=1,<2
+playwright>=1.50,<2

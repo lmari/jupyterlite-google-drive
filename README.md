@@ -4,7 +4,7 @@ Experimental browser-only JupyterLab extension for JupyterLite. Version 0.1.0-al
 
 ## Status
 
-Initial source prototype. The Drive API adapter has Node tests with mocked HTTP responses. The extension build and real browser OAuth/Picker integration have not been verified. Not yet appropriate for production or sensitive files.
+Initial source prototype. The Drive API adapter has Node tests with mocked HTTP responses. CI now checks the build and browser menu activation; inspect the Actions run for actual results. Real OAuth/Picker integration is not yet verified. Not yet appropriate for production or sensitive files.
 
 ## Workflow
 
@@ -18,24 +18,34 @@ The File menu contains five Google Drive commands: Connect, Open notebook, Save 
 4. Create an API key restricted to the appropriate web referrers and Picker API. Get the numeric Google Cloud project number (Picker app ID, not project name). All credentials must belong to the same project.
 5. Copy `demo/jupyter-lite.example.json` to `demo/jupyter-lite.json` and fill the three values as strings. `drive.file` only grants access to files created by the app or explicitly selected/authorized. No broad Drive scope.
 
-## Build and smoke test (proposed; not yet run end-to-end)
+## Build and smoke test
 
 Requires Python 3.10+ and Node.js 22. From project root:
 
 ```sh
 python -m venv .venv
 source .venv/bin/activate
-pip install 'jupyterlab>=4.6,<4.7' 'jupyterlite-core>=0.8,<0.9' 'jupyterlite-pyodide-kernel>=0.8,<0.9'
+python -m pip install -r requirements-build.txt
 npm install
+npm run check
 npm test
-npm run build
-mkdir -p .extra-labextensions
-cp -a labextension .extra-labextensions/jupyterlite-google-drive
-jupyter lite build --lite-dir demo --output-dir dist --FederatedExtensionAddon.extra_labextensions_path="$(pwd)/.extra-labextensions"
+python scripts/build_demo.py
+python -m playwright install chromium
+python scripts/smoke_browser.py
 python -m http.server 8000 --directory dist
 ```
 
-Open `http://localhost:8000/lab/index.html` directly, not inside an iframe for the first test. If rebuilding, remove the old `.extra-labextensions/jupyterlite-google-drive` before copying. Check build logs for the extension. The dependency ranges are proposed; lock versions once a clean build passes. For deployment, publish only dist, not secrets or local environments. An iframe may require additional browser popup/origin configuration and should be tested separately.
+Open `http://localhost:8000/lab/index.html` directly, not inside an iframe for the first test. The build script replaces generated extension and site directories and verifies federation assets and the demo notebook. Check build logs for the extension. The dependency ranges are proposed; lock versions once a clean build passes. For deployment, publish only dist, not secrets or local environments. An iframe may require additional browser popup/origin configuration and should be tested separately.
+
+## Continuous integration and GitHub Pages
+
+The Build and test workflow runs on pushes to main and pull requests. It checks JS syntax, runs unit tests, builds the extension with jupyter-builder (JupyterLab 4.6), builds JupyterLite, then starts Chromium against the site under a project URL prefix. It verifies the local demo notebook and five Google Drive menu commands. No real Google login or Python cell execution is asserted by this smoke test. The resulting static site is downloadable as a workflow artifact.
+
+To publish a demo, set Settings > Pages > Source to GitHub Actions. Then either run the Build and test workflow manually with its deploy option or create repository Actions variable PAGES_ENABLED=true for automatic deployment on pushes to main. The deployment job only runs after the build and browser checks pass.
+
+For cloud functionality set Actions repository variables GOOGLE_DRIVE_CLIENT_ID, GOOGLE_DRIVE_API_KEY and GOOGLE_DRIVE_APP_ID to the public configuration values from the Google Cloud setup section. All three are required together. Restrict the key and authorized origins in Google Cloud; these values appear in the static site by design. Never add a client secret. With no variables the demo builds with cloud access disabled. For local builds the variables can be provided in the shell or the runtime JSON file.
+
+Expected URL: https://lmari.github.io/jupyterlite-google-drive/lab/index.html
 
 ## Acceptance test
 
