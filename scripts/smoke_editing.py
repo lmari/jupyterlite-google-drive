@@ -1,7 +1,7 @@
 """Touch-only editing actions in a real notebook and Python kernel.
 
-Keyboard input is used only to set up test text; buttons and suggestions are
-activated with Playwright tap, not keyboard shortcuts.
+Buttons and suggestions are activated with Playwright tap. Ctrl+Space is
+also tested explicitly as a desktop completion shortcut.
 """
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -61,16 +61,31 @@ def main():
                         expect(suggestion).to_be_visible(timeout=30000)
                         suggestion.tap()
                         expect(code).to_have_text("statistics.mean")
+                        # The same completion through Ctrl+Space.
+                        code.tap()
+                        page.keyboard.press("Control+a")
+                        page.keyboard.insert_text("statistics.me")
+                        page.keyboard.press("Control+Space")
+                        expect(suggestion).to_be_visible(timeout=30000)
+                        page.keyboard.press("Enter")
+                        expect(code).to_have_text("statistics.mean")
                         # Position within the function name and request native kernel inspection.
                         code.tap()
                         page.keyboard.press("End")
                         page.keyboard.press("ArrowLeft")
                         bar.get_by_role("button",name="Help",exact=True).tap()
+                        help_panel=page.locator("#jupyterlite-python-help")
+                        expect(help_panel).to_be_visible(timeout=30000)
+                        expect(help_panel).to_contain_text(re.compile("arithmetic mean",re.I),timeout=30000)
+                        documentation=help_panel.locator("pre").text_content()
                         inspector=page.locator(".jp-Dialog:visible").filter(has_text="Python contextual help")
+                        expect(inspector).to_have_count(0)
+                        help_panel.get_by_role("button",name="Open in window").tap()
                         expect(inspector).to_be_visible(timeout=30000)
-                        expect(inspector).to_contain_text(re.compile("arithmetic mean",re.I),timeout=30000)
+                        expect(inspector.locator("pre")).to_have_text(documentation)
                         inspector.get_by_role("button",name="Close",exact=True).tap()
                         expect(inspector).to_be_hidden()
+                        expect(help_panel).to_be_visible()
                         # Undo and redo via touch. Wait beyond the Yjs capture
                         # window to separate this edit from completion history.
                         page.wait_for_timeout(600)
@@ -117,7 +132,7 @@ def main():
                         expect(variables.get_by_role("status")).to_contain_text("outdated")
                         refresh.tap()
                         expect(table.get_by_role("row").filter(has=page.get_by_role("cell",name="media",exact=True))).to_contain_text("12.0",timeout=30000)
-                        print("Touch editing tools verified: Markdown render, indentation, completion, help, undo/redo and explicit variable snapshots.")
+                        print("Touch editing tools verified: Markdown render, indentation, completion (tap and Ctrl+Space), sidebar/window help, undo/redo and explicit variable snapshots.")
                     except Exception:
                         print("Visible dialogs:",page.locator(".jp-Dialog:visible").all_text_contents())
                         print("Editing toolbar status:",page.locator(".jp-TouchEditingTools [role=status]").all_text_contents())

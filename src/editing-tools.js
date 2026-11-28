@@ -3,11 +3,112 @@ import {INotebookTracker} from '@jupyterlab/notebook';
 import {showDialog,Dialog} from '@jupyterlab/apputils';
 import {Text} from '@jupyterlab/coreutils';
 import {Widget} from '@lumino/widgets';
+import {helpIcon} from '@jupyterlab/ui-components';
 import {indentMore, indentLess} from '@codemirror/commands';
 
 const COMPLETE='completer:invoke-notebook';
 
-function install(app,panel) {
+// A snapshot of the requested kernel documentation; never inject HTML.
+const noDocumentation='No documentation found at the cursor. Place the cursor inside a function or object name, and run any required imports first.';
+
+class HelpSidebar extends Widget {
+  constructor(app){
+    super({node:document.createElement('section')});
+    this.app=app;
+    this.id='jupyterlite-python-help';
+    this.title.label='Help';this.title.caption='Python contextual help';this.title.icon=helpIcon;
+    this.node.setAttribute('aria-label','Python contextual help');
+    Object.assign(this.node.style,{padding:'12px',overflow:'auto',
+      background:'var(--jp-layout-color1)',color:'var(--jp-ui-font-color1)'});
+    const heading=document.createElement('h2');
+    heading.textContent='Python contextual help';
+    this.source=document.createElement('div');
+    this.source.style.fontSize='var(--jp-ui-font-size0)';
+    this.openButton=document.createElement('button');
+    this.openButton.type='button';this.openButton.className='jp-mod-styled';
+    this.openButton.textContent='Open in window';
+    Object.assign(this.openButton.style,{minHeight:'36px',margin:'8px 0',padding:'4px 10px'});
+    this.openButton.disabled=true;
+    this.openButton.addEventListener('click',()=>void this.openWindow());
+    this.documentation=document.createElement('pre');
+    Object.assign(this.documentation.style,{whiteSpace:'pre-wrap',overflowWrap:'anywhere',
+      fontSize:'var(--jp-code-font-size)'});
+    this.documentation.textContent='Select a code cell, place the cursor on an object and choose Help.';
+    this.node.append(heading,this.source,this.openButton,this.documentation);
+    this.windowOpen=false;
+    this.generation=0;
+  }
+  async openWindow(){
+    if(this.windowOpen||this.openButton.disabled)return;
+    this.windowOpen=true;
+    const body=new Widget({node:document.createElement('pre')});
+    body.node.textContent=this.documentation.textContent;
+    Object.assign(body.node.style,{whiteSpace:'pre-wrap',overflowWrap:'anywhere',
+      maxHeight:'55vh',maxWidth:'70vw',overflow:'auto',fontSize:'var(--jp-code-font-size)'});
+    try{
+      await showDialog({title:'Python contextual help',body,buttons:[Dialog.okButton({label:'Close'})]});
+    }finally{this.windowOpen=false;}
+  }
+  async present(panel,cell,editor){
+    const generation=++this.generation;
+    const kernel=panel.sessionContext.session?.kernel;
+    const source=cell.model.sharedModel.getSource();
+    const offset=editor.getOffsetAt(editor.getCursorPosition());
+    this.source.textContent=panel.title.label+' · Documentation at the requested cursor';
+    this.documentation.textContent='Loading documentation…';
+    this.openButton.disabled=true;
+    // Explicitly reveal a user-hidden activity bar before selecting this tab.
+    const shell=this.app.shell;
+    if(shell.isSideTabBarVisible?.('right')===false)
+      shell.toggleSideTabBarVisibility?.('right');
+    shell.activateById(this.id);
+    let documentation='';
+    try{
+      if(!kernel||kernel.isDisposed||kernel.status!=='idle'){
+        documentation='Start the Python kernel and wait until it is idle, then choose Help again.';
+      }else{
+        const positions=[offset];
+        if(offset>0&&/[\p{L}\p{N}_]/u.test(source[offset-1])&&
+           !/[\p{L}\p{N}_]/u.test(source[offset]||''))positions.push(offset-1);
+        for(const pos of positions){
+          const reply=await kernel.requestInspect({
+            code:source,cursor_pos:Text.jsIndexToCharIndex(pos,source),detail_level:1
+          });
+          if(generation!==this.generation)return;
+          if(panel.isDisposed||notebookChanged()){
+            this.documentation.textContent='The notebook or code changed. Choose Help again.';
+            return;
+          }
+          const content=reply.content;
+          if(content.status==='ok'&&content.found&&typeof content.data?.['text/plain']==='string'){
+            documentation=content.data['text/plain'];
+            if(documentation.trim())break;
+          }
+        }
+      }
+    }catch(error){
+      documentation='Could not retrieve documentation: '+String(error?.message||error);
+    }
+    function notebookChanged(){
+      return panel.content.activeCell!==cell||panel.sessionContext.session?.kernel!==kernel||
+        cell.model.sharedModel.getSource()!==source;
+    }
+    if(this.isDisposed||generation!==this.generation)return;
+    this.documentation.textContent=documentation
+      ?documentation.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g,'').slice(0,16000)
+      :noDocumentation;
+    this.openButton.disabled=false;
+    // If a responsive or customized layout still cannot show the sidebar,
+    // offer the existing modal instead of silently doing nothing.
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    if(this.isDisposed||generation!==this.generation)return;
+    const r=this.node.getBoundingClientRect();
+    if(!this.isVisible||r.width<120||r.height<100||r.left>=window.innerWidth||r.right<=0)
+      await this.openWindow();
+  }
+}
+
+function install(app,panel,help) {
   const notebook=panel.content;
   const bar=new Widget({node:document.createElement('div')});
   bar.addClass('jp-TouchEditingTools');
@@ -64,44 +165,12 @@ function install(app,panel) {
     cell.editor?.focus();
     return cell.editor;
   };
-  button('Complete','Show code completion suggestions at the cursor',async cell=>{
+  button('Complete','Show code completion suggestions at the cursor (Ctrl+Space)',async cell=>{
     if(await focusCode(cell))await app.commands.execute(COMPLETE);
   });
   button('Help','Show Python documentation at the cursor',async cell=>{
     const editor=await focusCode(cell);
-    if(!editor)return;
-    const kernel=panel.sessionContext.session?.kernel;
-    if(!kernel||kernel.isDisposed||kernel.status!=='idle'){
-      throw new Error('Start the Python kernel and wait until it is idle.');
-    }
-    const source=cell.model.sharedModel.getSource();
-    const offset=editor.getOffsetAt(editor.getCursorPosition());
-    // Native kernel inspection, not an execute request. IPython may treat
-    // a cursor immediately after a token as outside that token.
-    const positions=[offset];
-    if(offset>0&&/[\p{L}\p{N}_]/u.test(source[offset-1])&&
-       !/[\p{L}\p{N}_]/u.test(source[offset]||''))positions.push(offset-1);
-    let documentation='';
-    for(const pos of positions){
-      const reply=await kernel.requestInspect({
-        code:source,cursor_pos:Text.jsIndexToCharIndex(pos,source),detail_level:1
-      });
-      if(panel.isDisposed||notebook.activeCell!==cell||
-         panel.sessionContext.session?.kernel!==kernel||
-         cell.model.sharedModel.getSource()!==source)return;
-      const content=reply.content;
-      if(content.status==='ok'&&content.found&&typeof content.data?.['text/plain']==='string'){
-        documentation=content.data['text/plain'];
-        if(documentation.trim())break;
-      }
-    }
-    const body=new Widget({node:document.createElement('pre')});
-    body.node.textContent=documentation
-      ?documentation.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g,'').slice(0,16000)
-      :'No documentation found at the cursor. Place the cursor inside a function or object name, and run any required imports first.';
-    Object.assign(body.node.style,{whiteSpace:'pre-wrap',overflowWrap:'anywhere',
-      maxHeight:'55vh',maxWidth:'70vw',overflow:'auto',fontSize:'var(--jp-code-font-size)'});
-    await showDialog({title:'Python contextual help',body,buttons:[Dialog.okButton({label:'Close'})]});
+    if(editor)await help.present(panel,cell,editor);
   });
   button('Variables','Inspect the current Python namespace',async()=>{
     await app.commands.execute('jupyterlite-touch-tools:show-variables',{widgetId:panel.id});
@@ -168,10 +237,17 @@ export default {
   autoStart:true,
   requires:[INotebookTracker],
   activate(app,tracker){
+    const help=new HelpSidebar(app);
+    app.shell.add(help,'right',{rank:710});
+    // Native notebook completer, scoped to editable code cells only.
+    app.commands.addKeyBinding({
+      command:COMPLETE,keys:['Ctrl Space'],
+      selector:'.jp-Notebook.jp-mod-editMode .jp-CodeCell .cm-content'
+    });
     const installed=new WeakSet();
     const add=panel=>{
       if(!panel.isDisposed&&!installed.has(panel)){
-        installed.add(panel);install(app,panel);
+        installed.add(panel);install(app,panel,help);
       }
     };
     tracker.forEach(add);

@@ -11,7 +11,7 @@
 
 ## Modificare le celle anche su tablet
 
-Seleziona una cella Python: la barra Editing offre Complete, Help, Indent, Dedent, Undo e Redo. Esegui prima gli import per ottenere suggerimenti del kernel. Seleziona una cella Markdown: usa Edit Markdown per modificarla e Render Markdown per visualizzare il testo formattato senza eseguire codice Python. Non serve Ctrl.
+Seleziona una cella Python: la barra Editing offre Complete, Help, Indent, Dedent, Undo e Redo. Esegui prima gli import per ottenere suggerimenti del kernel. Da PC puoi usare anche Ctrl+Spazio per Complete. Help apre la documentazione nel pannello a destra; Open in window mostra lo stesso testo in una finestra. Seleziona una cella Markdown: usa Edit Markdown per modificarla e Render Markdown per visualizzare il testo formattato senza eseguire codice Python. Non serve Ctrl.
 
 ## Osservare le variabili Python
 
