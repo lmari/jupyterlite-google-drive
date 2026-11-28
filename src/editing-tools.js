@@ -103,6 +103,10 @@ function install(app,panel) {
       maxHeight:'55vh',maxWidth:'70vw',overflow:'auto',fontSize:'var(--jp-code-font-size)'});
     await showDialog({title:'Python contextual help',body,buttons:[Dialog.okButton({label:'Close'})]});
   });
+  button('Variables','Inspect the current Python namespace',async()=>{
+    app.shell.activateById(panel.id);
+    await app.commands.execute('jupyterlite-touch-tools:show-variables');
+  });
   const editCommand=command=>async cell=>{
     const editor=await focusCode(cell);
     if(editor?.execCommand)editor.execCommand(command);
@@ -136,6 +140,7 @@ function install(app,panel) {
       b.hidden=!code;
       b.disabled=!editable||(name==='Complete'&&!app.commands.hasCommand(COMPLETE));
     }
+    buttons.get('Variables').hidden=!app.commands.hasCommand('jupyterlite-touch-tools:show-variables');
     for(const name of ['Edit Markdown','Render Markdown']){
       const b=buttons.get(name);b.hidden=!markdown;b.disabled=!editable;
     }

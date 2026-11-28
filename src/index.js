@@ -5,6 +5,7 @@ import {IMainMenu} from '@jupyterlab/mainmenu';
 import {INotebookTracker} from '@jupyterlab/notebook';
 import {Menu} from '@lumino/widgets';
 import editingTools from './editing-tools.js';
+import variableInspector from './variable-inspector.js';
 import {GoogleAuth} from './auth.js';
 import {DriveAPI, notebookName} from './drive-api.js';
 import {NativeDrive} from './native-drive.js';
@@ -398,4 +399,4 @@ const plugin = {
     void auth.prepare().then(() => {prepared = true;refreshSidebar();}).catch(e => {preparationError = String(e.message || e);refreshSidebar();});
   }
 };
-export default [plugin,editingTools];
+export default [plugin,editingTools,variableInspector];
