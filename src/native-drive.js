@@ -17,6 +17,7 @@ export class NativeDrive {
   fileChanged = new Signal(this);
   #entries = new Map();
   #data = new Map();
+  #folderFiles = new Map();
   #outputs = new Map();
   #generation = 0;
   constructor(api) { this.api = api; }
@@ -38,6 +39,7 @@ export class NativeDrive {
     this.#generation++;
     this.#entries.clear();
     this.#data.clear();
+    this.#folderFiles.clear();
     this.#outputs.clear();
   }
   dispose() {
@@ -46,6 +48,7 @@ export class NativeDrive {
     this.#generation++;
     this.#entries.clear();
     this.#data.clear();
+    this.#folderFiles.clear();
     this.#outputs.clear();
     Signal.clearData(this);
   }
@@ -72,6 +75,28 @@ export class NativeDrive {
     if (previous && previous.id !== meta.id) throw new Error('A different data file already uses this name. Rename it in Google Drive before mounting.');
     this.#data.set(path, {id:meta.id,meta});
     return path;
+  }
+  setFolderFiles(files) {
+    const next=new Map(), ambiguous=new Set();
+    for(const f of files) {
+      // Only safe single-component names; reserve the explicit mount namespaces.
+      if(!f.id || !f.mimeType || f.mimeType.startsWith('application/vnd.google-apps.') ||
+        /\.ipynb$/i.test(f.name) || !f.name || /[\\/:\x00-\x1f]/.test(f.name) ||
+        ['.','..','data','output'].includes(f.name)) continue;
+      if(next.has(f.name)) ambiguous.add(f.name);
+      next.set(f.name,{id:f.id,meta:f});
+    }
+    for(const name of ambiguous) next.delete(name);
+    this.#folderFiles=next;
+  }
+  async #getFolderFile(path,options) {
+    const entry=this.#folderFiles.get(path), generation=this.#generation;
+    const result=options.content===false
+      ? {meta:validateDataMetadata(await this.api.metadata(entry.id)),bytes:null}
+      : await this.api.readData(entry.id);
+    if(this.isDisposed || generation!==this.#generation || this.#folderFiles.get(path)!==entry)
+      throw new Error('Google Drive folder changed; retry.');
+    return this.#dataModel(path,result.meta,result.bytes);
   }
   #dataModel(path,meta,bytes=null) {
     const size = Number(meta.size);
@@ -179,6 +204,7 @@ export class NativeDrive {
       return this.#directory('',options.content === false ? null : [
         this.#directory('data',null),
         {...this.#directory('output',null),writable:true},
+        ...[...this.#folderFiles].map(([p,e])=>this.#dataModel(p,e.meta)),
         ...[...this.#entries].map(([p,e]) => this.#model(p,{modifiedTime:e.modified,capabilities:{canEdit:e.canEdit}}))
       ]);
     }
@@ -191,6 +217,7 @@ export class NativeDrive {
       if (!entry || this.isDisposed) throw new Error('Output file not found.');
       return this.#outputModel(path,entry,options.content !== false);
     }
+    if(this.#folderFiles.has(path)) return this.#getFolderFile(path,options);
     const entry = this.#entry(path);
     const generation = this.#generation;
     if (options.content === false) {
@@ -216,7 +243,7 @@ export class NativeDrive {
   }
   async save(path, options = {}) {
     if (path.startsWith('output/')) return this.#saveOutput(path,options);
-    if (path === 'data' || path.startsWith('data/')) throw unavailable();
+    if (path === 'data' || path.startsWith('data/') || this.#folderFiles.has(path)) throw unavailable();
     if (options.type && options.type !== 'notebook') throw unavailable();
     const entry = this.#entry(path);
     if (!entry.version || entry.canEdit === false) throw unavailable();

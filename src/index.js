@@ -33,6 +33,7 @@ const plugin = {
     const loadFolder = async () => {
       const folder=await ensureFolder();
       authorizedFiles=await drive.listFolder(folder.id);
+      native.setFolderFiles(authorizedFiles);
       listLoaded=true;
     };
     const tell = (title, body) => showDialog({title, body, buttons: [Dialog.okButton()]});
@@ -235,10 +236,14 @@ const plugin = {
       if(!file) throw new Error('Refresh the folder and select a supported text datafile.');
       const {meta,bytes}=await drive.readData(file.id);
       const text=decodeTextData(bytes);
-      const ext=meta.name.slice(meta.name.lastIndexOf('.'));
-      const temp=await contents.newUntitled({type:'file',ext});
-      await contents.save(temp.path,{type:'file',format:'text',content:text});
-      const widget=docs.openOrReveal(temp.path,'Editor');
+      // A fresh local directory avoids overwriting existing files, while
+      // preserving the exact basename shown in the editor tab.
+      if(!meta.name || /[\\/:\x00-\x1f]/.test(meta.name) || ['.','..'].includes(meta.name))
+        throw new Error('This filename cannot be represented safely in local storage.');
+      const temp=await contents.newUntitled({type:'directory'});
+      const path=temp.path+'/'+meta.name;
+      await contents.save(path,{type:'file',format:'text',content:text});
+      const widget=docs.openOrReveal(path,'Editor');
       if(!widget) throw new Error('Local datafile copy created but the text editor could not open it.');
       const context=docs.contextForWidget(widget);
       if(!context) throw new Error('Datafile editor context unavailable.');
@@ -442,6 +447,7 @@ const plugin = {
         folders.push(child);
       }
       authorizedFiles=[];listLoaded=false;
+      native.setFolderFiles([]);
       sidebar.setViewMode('files');
       app.shell.activateById(sidebar.id);
       await loadFolder();

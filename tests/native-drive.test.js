@@ -160,3 +160,19 @@ test('staging refuses oversized file without changing existing snapshot',async()
   await assert.rejects(d.save('output/result.txt',{type:'file',format:'text',content:'x'.repeat(5242881)}),/5 MiB/);
   assert.equal(new TextDecoder().decode(d.outputSnapshot('output/result.txt').bytes),'safe');
 });
+
+test('current folder files use fresh remote bytes at root and never permit writes',async()=>{
+  let bytes=Uint8Array.of(1);
+  const api={metadata:async()=>csvMeta,readData:async()=>({meta:csvMeta,bytes})};
+  const d=new NativeDrive(api);
+  d.setFolderFiles([csvMeta]);
+  assert.ok((await d.get('')).content.some(x=>x.name==='dati.csv'));
+  assert.equal((await d.get('dati.csv')).content,'AQ==');
+  bytes=Uint8Array.of(2);
+  assert.equal((await d.get('dati.csv')).content,'Ag==');
+  await assert.rejects(d.save('dati.csv',{type:'file',content:'x'}),/not supported/);
+  d.setFolderFiles([csvMeta,{...csvMeta,id:'duplicate'}]);
+  assert.ok(!(await d.get('')).content.some(x=>x.name==='dati.csv'));
+  d.setFolderFiles([csvMeta]);d.reset();
+  assert.ok(!(await d.get('')).content.some(x=>x.name==='dati.csv'));
+});
