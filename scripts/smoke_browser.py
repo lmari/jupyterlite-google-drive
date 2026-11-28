@@ -38,8 +38,8 @@ def main():
                         expect(labels.filter(has_text=re.compile(r"^Google Drive \(advanced\)$"))).to_have_count(1)
                         expect(labels.filter(has_text=re.compile(r"^Google Drive:"))).to_have_count(0)
                         for title, menu_id, expected in [
-                            ("Google Drive (advanced)", "jupyterlite-google-drive-advanced-menu", ["Open notebook","Browse authorized notebooks","Save to original","Remove recorded data dependency","Remember mounted data in notebook","Import data into Python","Notebook and data status","Save local recovery copy","Download notebook recovery file","Download Python output locally","Disconnect"]),
-                            ("Google Drive", "jupyterlite-google-drive-menu", ["Connect","Open folder","Renew authorization","Open native notebook (experimental)","Save a new copy","Refresh workspace list","New folder","Mount read-only data file (experimental)","Add selected data dependency","Restore notebook data dependencies","Export Python output as new file"])
+                            ("Google Drive (advanced)", "jupyterlite-google-drive-advanced-menu", ["Renew authorization","Open native notebook (experimental)","Open notebook","Browse authorized notebooks","Save to original","Save a new copy","Refresh workspace list","New folder","Mount read-only data file (experimental)","Import data into Python","Export Python output as new file","Add selected data dependency","Remove recorded data dependency","Remember mounted data in notebook","Restore notebook data dependencies","Notebook and data status","Save local recovery copy","Download notebook recovery file","Download Python output locally"]),
+                            ("Google Drive", "jupyterlite-google-drive-menu", ["Connect","Open folder","Save current notebook","Save current datafile","Disconnect"])
                         ]:
                             labels.filter(has_text=re.compile("^"+re.escape(title)+"$")).hover()
                             submenu=page.locator("#"+menu_id)

@@ -2,7 +2,7 @@
 
 A browser-only JupyterLab extension for JupyterLite that connects Python notebooks and their data to Google Drive. Work in a web browser, keep notebooks on Drive, and resume work on another device. No JupyterLite fork, application backend, or local Python installation is required for end users.
 
-**Current version: 0.6.0-beta.9 (experimental candidate).** Built for JupyterLite 0.9.0b2, JupyterLab 4.7.0b2, Pyodide kernel 0.9.0b0 and Lumino Widgets 2.10.0.
+**Current version: 0.6.0-beta.10 (experimental candidate).** Built for JupyterLite 0.9.0b2, JupyterLab 4.7.0b2, Pyodide kernel 0.9.0b0 and Lumino Widgets 2.10.0.
 
 **[Open the live demo](https://lmari.github.io/jupyterlite-google-drive/lab/index.html)** · [Student quickstart (Italian)](docs/student-quickstart-it.md) · [Install the extension](docs/distribution.md) · [Google Cloud setup](#google-cloud-setup)
 
@@ -307,3 +307,5 @@ Priorities are real-account and tablet acceptance, usability for touch devices, 
 License: [BSD 3-Clause](LICENSE).
 
 **Folder browser (beta 9):** File > Google Drive > Open folder displays only the folder contents and navigation controls. To view save status, mounted data, dependencies and local recovery actions, use File > Google Drive (advanced) > Notebook and data status.
+
+**Beta 10:** the ordinary Google Drive submenu has Connect, Open folder, Save current notebook, Save current datafile, Disconnect. Open folder opens notebooks directly and supported UTF-8 text datafiles as editable local copies linked to Drive for the current authorization session. Save current datafile explicitly uploads the live text; normal Ctrl+S saves only the local copy. Binary data stays available via the advanced mount/import/export workflow. The 5 MiB data limit and version checks remain in force.

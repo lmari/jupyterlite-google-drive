@@ -7,7 +7,7 @@ import {Menu} from '@lumino/widgets';
 import editingTools from './editing-tools.js';
 import variableInspector from './variable-inspector.js';
 import {GoogleAuth} from './auth.js';
-import {DriveAPI, notebookName, folderMime} from './drive-api.js';
+import {DriveAPI, notebookName, folderMime, isTextDatafile, decodeTextData} from './drive-api.js';
 import {NativeDrive} from './native-drive.js';
 import {dataPath, transferData} from './kernel-data.js';
 import {DriveSidebar} from './sidebar.js';
@@ -22,7 +22,7 @@ const plugin = {
     const auth = new GoogleAuth({clientId: PageConfig.getOption('googleDriveClientId'),
       apiKey: PageConfig.getOption('googleDriveApiKey'), appId: PageConfig.getOption('googleDriveAppId')});
     const drive = new DriveAPI(() => auth.token(),undefined,token=>auth.invalidate(token));
-    let links = new WeakMap(); let busy = false; let prepared = false; let preparationError = '';
+    let links = new WeakMap(); let dataLinks=new WeakMap(); let busy = false; let prepared = false; let preparationError = '';
     let sidebar; let authorizedFiles = []; let listLoaded = false; let folders=[]; const commandIds=[];
     const refreshSidebar = () => { sidebar?.refresh(); for(const id of commandIds) app.commands.notifyCommandChanged(id); };
     const clearList = () => { authorizedFiles=[]; listLoaded=false; folders=[]; };
@@ -68,6 +68,15 @@ const plugin = {
       if (!panel || app.shell.currentWidget !== panel) throw new Error('Select an open notebook first.');
       return panel;
     };
+    const activeNotebook=()=>{const panel=tracker.currentWidget;return panel&&!panel.isDisposed&&app.shell.currentWidget===panel?panel:null;};
+    const activeData=()=>{
+      const widget=app.shell.currentWidget;
+      if(!widget || activeNotebook()) return null;
+      const context=docs.contextForWidget(widget);
+      if(!context || context.isDisposed || contents.driveName(context.path) ||
+        !isTextDatafile(context.path) || typeof context.model?.toString!=='function') return null;
+      return context;
+    };
     const run = fn => async (args) => {
       if (busy) return;
       busy = true; refreshSidebar();
@@ -80,6 +89,8 @@ const plugin = {
       const enabled=()=>!busy && (name==='connect'?prepared:
         name==='renew'?prepared&&auth.hasAccount:
         name==='disconnect'?auth.hasAccount:
+        name==='save-current-notebook'?auth.status==='connected'&&!!activeNotebook():
+        name==='save-current-datafile'?auth.status==='connected'&&!!activeData():
         ['recover','download-notebook','download-output','notebook-status'].includes(name)?true:auth.status==='connected');
       app.commands.addCommand(id, {label:args=>args.inDriveMenu?label.replace(/^Google Drive: /,''):label, isEnabled:enabled, execute:args=>enabled()?run(fn)(args):undefined});
       return {command: id};
@@ -88,7 +99,7 @@ const plugin = {
       if (!prepared) throw new Error(preparationError || 'Google libraries are loading. Retry shortly.');
       requireClosed();
       if (!(await confirmOutputDiscard())) return;
-      await auth.connect(); links = new WeakMap(); native.reset(); clearList();
+      await auth.connect(); links = new WeakMap(); dataLinks=new WeakMap(); native.reset(); clearList();
       await tell('Google Drive', 'Connected. Choose Open folder to browse JupyterLite.');
     });
     const renew = add('renew','Google Drive: Renew authorization',async()=>{
@@ -132,12 +143,14 @@ const plugin = {
       if (selected) await openRemote(selected.id);
     });
     const nativeOpen = add('native-open', 'Google Drive: Open native notebook (experimental)', async (args={}) => {
+      if(!args.fileId) {
       const answer = await showDialog({
         title: 'Experimental remote editor',
         body: 'This notebook opens directly on Google Drive. Standard save and JupyterLab autosave may write remotely. Checkpoints are available only in the current editor session; rename and delete are not implemented. You can make a local recovery copy without Google access. Use a disposable notebook only. Close it before switching accounts.',
         buttons: [Dialog.cancelButton(), Dialog.okButton({label:'Continue'})]
       });
       if (!answer.button.accept) return;
+      }
       // A sidebar row may open a file from the current authorized listing.
       const id = args.fileId ? authorizedFiles.find(f=>f.id===args.fileId)?.id : await auth.pick();
       if (args.fileId && !id) throw new Error('Refresh the authorized notebook list first.');
@@ -171,7 +184,7 @@ const plugin = {
         });
       }
       await panel.context.ready;
-      await tell('Google Drive', 'Opened native notebook. Standard Save writes to Google Drive. For recovery, use Google Drive: Save local recovery copy.');
+      if(!args.fileId) await tell('Google Drive', 'Opened native notebook. Standard Save writes to Google Drive. For recovery, use Google Drive: Save local recovery copy.');
     });
     const save = add('save', 'Google Drive: Save to original', async () => {
       const panel = current();
@@ -195,6 +208,62 @@ const plugin = {
       if (!nativePath) links.set(panel, {id: meta.id, name: meta.name, version: meta.version});
       try { await loadFolder(); } catch { authorizedFiles=[]; listLoaded=false; }
       await tell('Google Drive', `Created ${meta.name} in JupyterLite (${folder.name}).`+(nativePath?' Standard Save still targets the originally opened notebook.':''));
+    });
+    const saveCurrentNotebook=add('save-current-notebook','Google Drive: Save current notebook',async()=>{
+      const panel=current(); await panel.context.ready;
+      if(panel.context.path.startsWith(native.name+':')) {
+        await panel.context.save();
+        return;
+      }
+      const link=links.get(panel);
+      if(link) {
+        const answer=await showDialog({title:'Update Google Drive?',body:'Overwrite '+link.name+' with the current notebook?',buttons:[Dialog.cancelButton(),Dialog.okButton()]});
+        if(!answer.button.accept) return;
+        const meta=await drive.update(link.id,link.version,panel.context.model.toJSON());
+        links.set(panel,{id:meta.id,name:meta.name,version:meta.version});
+        await tell('Google Drive','Saved '+meta.name+'.');
+      } else {
+        const folder=await ensureFolder();
+        const meta=await drive.create(notebookName(panel.context.path.split('/').pop()),panel.context.model.toJSON(),folder.id);
+        links.set(panel,{id:meta.id,name:meta.name,version:meta.version});
+        try {await loadFolder();} catch {authorizedFiles=[];listLoaded=false;}
+        await tell('Google Drive','Created '+meta.name+' in '+folder.name+'.');
+      }
+    });
+    add('open-datafile','Google Drive: Open datafile',async(args={})=>{
+      const file=authorizedFiles.find(f=>f.id===args.fileId&&isTextDatafile(f.name)&&!f.mimeType?.startsWith('application/vnd.google-apps.'));
+      if(!file) throw new Error('Refresh the folder and select a supported text datafile.');
+      const {meta,bytes}=await drive.readData(file.id);
+      const text=decodeTextData(bytes);
+      const ext=meta.name.slice(meta.name.lastIndexOf('.'));
+      const temp=await contents.newUntitled({type:'file',ext});
+      await contents.save(temp.path,{type:'file',format:'text',content:text});
+      const widget=docs.openOrReveal(temp.path,'Editor');
+      if(!widget) throw new Error('Local datafile copy created but the text editor could not open it.');
+      const context=docs.contextForWidget(widget);
+      if(!context) throw new Error('Datafile editor context unavailable.');
+      await context.ready;
+      dataLinks.set(context,{id:meta.id,name:meta.name,version:meta.version});
+    });
+    const saveCurrentData=add('save-current-datafile','Google Drive: Save current datafile',async()=>{
+      const context=activeData();
+      if(!context) throw new Error('Select an open text datafile first.');
+      await context.ready;
+      const bytes=new TextEncoder().encode(context.model.toString());
+      const link=dataLinks.get(context);
+      if(link) {
+        const answer=await showDialog({title:'Update Google Drive?',body:'Overwrite '+link.name+' with the current datafile?',buttons:[Dialog.cancelButton(),Dialog.okButton()]});
+        if(!answer.button.accept) return;
+        const meta=await drive.updateData(link.id,link.version,bytes);
+        dataLinks.set(context,{id:meta.id,name:meta.name,version:meta.version});
+        await tell('Google Drive','Saved '+meta.name+'.');
+      } else {
+        const folder=await ensureFolder();
+        const meta=await drive.createData(context.path.split('/').pop(),bytes,folder.id);
+        dataLinks.set(context,{id:meta.id,name:meta.name,version:meta.version});
+        try {await loadFolder();} catch {authorizedFiles=[];listLoaded=false;}
+        await tell('Google Drive','Created '+meta.name+' in '+folder.name+'.');
+      }
     });
     const recover = add('recover', 'Google Drive: Save local recovery copy', async () => {
       const panel = current();
@@ -359,7 +428,7 @@ const plugin = {
     const disconnect = add('disconnect', 'Google Drive: Disconnect', async () => {
       requireClosed();
       if (!(await confirmOutputDiscard())) return;
-      auth.disconnect(); links = new WeakMap(); native.reset(); clearList();
+      auth.disconnect(); links = new WeakMap(); dataLinks=new WeakMap(); native.reset(); clearList();
       await tell('Google Drive', 'Disconnected. Local notebook copies remain in this browser.');
     });
     const refreshList=add('refresh-list','Google Drive: Refresh workspace list',async()=>{
@@ -408,6 +477,7 @@ const plugin = {
     });
     app.shell.add(sidebar,'left',{rank:700});
     tracker.currentChanged.connect(refreshSidebar);
+    app.shell.currentChanged?.connect(refreshSidebar);
     native.fileChanged.connect(refreshSidebar);
 
     // Two compact File entries. Keep the ordinary native workflow separate
@@ -423,15 +493,15 @@ const plugin = {
       return submenu;
     };
     const driveMenu=buildMenu('jupyterlite-google-drive-menu','Google Drive',[
-      [connect,openFolder,renew],
-      [nativeOpen,saveAs,refreshList,newFolder],
-      [mountData,addDataDependency,restoreData,exportData]
+      [connect,openFolder],
+      [saveCurrentNotebook,saveCurrentData],
+      [disconnect]
     ]);
     const advancedMenu=buildMenu('jupyterlite-google-drive-advanced-menu','Google Drive (advanced)',[
-      [open,browse,save],
-      [removeDataDependency,rememberData,importData],
-      [notebookStatus,recover,downloadNotebook,downloadOutput],
-      [disconnect]
+      [renew,nativeOpen,open,browse,save,saveAs],
+      [refreshList,newFolder],
+      [mountData,importData,exportData,addDataDependency,removeDataDependency,rememberData,restoreData],
+      [notebookStatus,recover,downloadNotebook,downloadOutput]
     ]);
     menu.fileMenu.addGroup([
       {type:'submenu',submenu:driveMenu},

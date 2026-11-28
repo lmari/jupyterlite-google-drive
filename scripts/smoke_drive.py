@@ -57,6 +57,7 @@ class FakeDrive:
         self.unavailable = False
         self.expire_original_token = False
         self.csv_data = "x,y\n2,3\n4,5\n"
+        self.csv_version = 1
 
     def metadata(self):
         return {"id":"demo-file", "name":"remote.ipynb", "version":str(self.version),
@@ -88,7 +89,7 @@ class FakeDrive:
             if parse_qs(url.query).get("alt") == ["media"]:
                 route.fulfill(status=200, headers=cors, content_type="text/csv", body=self.csv_data)
                 return
-            value = {"id":"data-file","name":"dati.csv","version":"1","mimeType":"text/csv","size":"12","trashed":False}
+            value = {"id":"data-file","name":"dati.csv","version":str(self.csv_version),"mimeType":"text/csv","size":"12","trashed":False}
         elif url.path == "/drive/v3/files/other-data" and req.method == "GET":
             if parse_qs(url.query).get("alt") == ["media"]:
                 route.fulfill(status=200,headers=cors,content_type="text/csv",body="x\n99\n")
@@ -99,7 +100,7 @@ class FakeDrive:
             if "'root' in parents" in query:
                 value = {"files":[{"id":"workspace","name":"JupyterLite","mimeType":"application/vnd.google-apps.folder"}]}
             elif "'workspace' in parents" in query:
-                value = {"files":[self.metadata(), {"id":"other","name":"ignore.csv"},
+                value = {"files":[self.metadata(), {"id":"data-file","name":"dati.csv","mimeType":"text/csv"},
                                   {"id":"subfolder","name":"Exercises","mimeType":"application/vnd.google-apps.folder"}]}
             elif "'subfolder' in parents" in query:
                 value = {"files":[]}
@@ -116,6 +117,10 @@ class FakeDrive:
             data_bytes = parts[1].get_payload(decode=True)
             self.created_data.append((metadata["name"], data_bytes))
             value = {"id":"new-data-" + str(len(self.created_data)), "name":metadata["name"], "version":"1"}
+        elif url.path == "/upload/drive/v3/files/data-file" and req.method == "PATCH":
+            self.csv_data = req.post_data_buffer.decode("utf-8")
+            self.csv_version += 1
+            value = {"id":"data-file","name":"dati.csv","version":str(self.csv_version)}
         elif url.path == "/upload/drive/v3/files/demo-file" and req.method == "PATCH":
             if self.hold_next_write:
                 self.hold_next_write = False
@@ -157,7 +162,7 @@ def edit_cell(page, cell, text):
     expect(cell).to_have_text(text)
 
 def command(page, label):
-    advanced = ["Notebook and data status","Open notebook","Browse authorized notebooks","Save to original","Remove recorded data dependency","Remember mounted data in notebook","Import data into Python","Save local recovery copy","Download notebook recovery file","Download Python output locally","Disconnect"]
+    advanced = ["Renew authorization","Open native notebook (experimental)","Open notebook","Browse authorized notebooks","Save to original","Save a new copy","Refresh workspace list","New folder","Mount read-only data file (experimental)","Import data into Python","Export Python output as new file","Add selected data dependency","Remove recorded data dependency","Remember mounted data in notebook","Restore notebook data dependencies","Notebook and data status","Save local recovery copy","Download notebook recovery file","Download Python output locally"]
     is_advanced = label in advanced
     title = "Google Drive (advanced)" if is_advanced else "Google Drive"
     menu_id = "jupyterlite-google-drive-advanced-menu" if is_advanced else "jupyterlite-google-drive-menu"

@@ -4,7 +4,7 @@
 
 1. Apri [JupyterLite](https://lmari.github.io/jupyterlite-google-drive/lab/index.html?path=primi-passi.ipynb). Non occorre installare Python. Il notebook primi-passi.ipynb contiene un esercizio guidato.
 2. Esegui una cella con Ctrl+Invio. Scegli File → Google Drive → Connect, autorizza l'account e poi scegli Open folder. Il notebook iniziale rimane locale.
-3. Usa File → Google Drive → Save a new copy, poi Refresh folder e apri la copia remota. Ctrl+S salva sul file remoto soltanto quando stai lavorando nella copia remota. Controlla lo stato di salvataggio da File → Google Drive (advanced) → Notebook and data status.
+3. Usa File → Google Drive → Save current notebook, poi Refresh folder e apri la copia remota. Ctrl+S salva sul file remoto soltanto quando stai lavorando nella copia remota. Controlla lo stato di salvataggio da File → Google Drive (advanced) → Notebook and data status.
 4. Carica su Drive un CSV di prova dati.csv, con intestazione x,y e righe 2,3 e 4,5. Nel notebook remoto usa Mount data file… e Add selected dependency… per registrare il file. Salva.
 5. Esegui le celle dell'esercizio. I dati montati sono in sola lettura. I file sotto /drive/output/ sono temporanei: esportali o scaricali prima di chiudere.
 6. Da un altro dispositivo, collega lo stesso account, apri il notebook remoto, scegli Restore notebook data dependencies e riesegui il codice dall'inizio.

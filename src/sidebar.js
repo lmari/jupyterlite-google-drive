@@ -1,3 +1,4 @@
+import {isTextDatafile} from './drive-api.js';
 import {Widget} from '@lumino/widgets';
 import {folderIcon} from '@jupyterlab/ui-components';
 
@@ -97,8 +98,9 @@ export class DriveSidebar extends Widget {
           const item=element('div');
           item.setAttribute('role','listitem');
           const label=(folder?'📁 ':notebook?'📓 ':'📄 ')+file.name+(file.readOnly?' (read-only)':'');
-          if(folder||notebook) {
-            const b=button(label,folder?'open-folder':'native-open',true,folder?{folderId:file.id}:{fileId:file.id});
+          const datafile=isTextDatafile(file.name)&&!file.mimeType?.startsWith('application/vnd.google-apps.');
+          if(folder||notebook||datafile) {
+            const b=button(label,folder?'open-folder':notebook?'native-open':'open-datafile',true,folder?{folderId:file.id}:{fileId:file.id});
             b.setAttribute('aria-label',(folder?'Open folder ':'Open ')+file.name);
             b.title=file.name;
             b.style.overflowWrap='anywhere';

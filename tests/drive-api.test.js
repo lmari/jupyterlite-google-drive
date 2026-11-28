@@ -122,3 +122,21 @@ test('folder listing follows pagination and scopes every request to parent',asyn
   assert.deepEqual((await api.listFolder('folder-1')).map(f=>f.id),['abc','sub']);
   for(const c of calls) assert.match(new URL(c.url).searchParams.get('q'),/'folder-1' in parents/);
 });
+
+test('data update is version guarded and preserves raw bytes',async()=>{
+  const meta={id:'data',name:'data.csv',version:'1',mimeType:'text/csv',capabilities:{canEdit:true}};
+  const bytes=new TextEncoder().encode('x,y\n1,2\n');
+  const {api,calls}=mock(meta,{...meta,version:'2'});
+  assert.equal((await api.updateData('data','1',bytes)).version,'2');
+  assert.equal(calls[1].opts.method,'PATCH');
+  assert.deepEqual(calls[1].opts.body,bytes);
+  const stale=mock({...meta,version:'2'});
+  await assert.rejects(stale.api.updateData('data','1',bytes),/changed/);
+  assert.equal(stale.calls.length,1);
+});
+test('editable datafile format is explicitly limited to UTF-8 text',async()=>{
+  const {isTextDatafile,decodeTextData}=await import('../src/drive-api.js');
+  assert.ok(isTextDatafile('data.CSV'));
+  assert.ok(!isTextDatafile('image.png'));
+  assert.throws(()=>decodeTextData(Uint8Array.of(255)));
+});

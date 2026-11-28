@@ -64,9 +64,17 @@ def main():
                         expect(workspace.get_by_text("No authorized files in this folder.",exact=True)).to_be_visible()
                         workspace.get_by_role("button",name="Up one folder",exact=True).click()
                         expect(workspace.get_by_role("button",name="Open remote.ipynb",exact=True)).to_be_enabled(timeout=30000)
+                        workspace.get_by_role("button",name="Open dati.csv",exact=True).click()
+                        editor=page.locator(".jp-FileEditor:visible .cm-content").first
+                        expect(editor).to_be_visible(timeout=30000)
+                        expect(editor).to_contain_text("x,y")
+                        command(page,"Save current datafile")
+                        dialog(page,"Overwrite dati.csv")
+                        dialog(page,"Saved dati.csv.")
+                        assert fake.csv_version == 2
+                        assert fake.csv_data == "x,y\n2,3\n4,5\n"
                         workspace.get_by_role("button",name="Open remote.ipynb",exact=True).click()
-                        dialog(page,"Experimental remote editor")
-                        dialog(page,"Opened native notebook")
+                        expect(page.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first).to_have_text("40 + 2",timeout=30000)
                         command(page,"Notebook and data status")
                         expect(workspace.get_by_role("heading",name="Current notebook")).to_be_visible()
                         command(page,"Open folder")

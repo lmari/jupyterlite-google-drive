@@ -26,6 +26,11 @@ export function validateDataMetadata(meta) {
     if (!meta.version) throw new Error('Drive did not return a file version.');
   return meta;
 }
+// The first editable datafile workflow is deliberately limited to UTF-8 text.
+export const isTextDatafile = name => /\.(csv|tsv|txt|json|jsonl|xml|yaml|yml|md|log|dat|py|r|sql|html|css|js)$/i.test(name);
+export function decodeTextData(bytes) {
+  return new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(bytes);
+}
 export class DriveAPI {
   constructor(token, fetcher = globalThis.fetch.bind(globalThis), onUnauthorized = () => {}) {
     this.token = token; this.fetcher = fetcher; this.onUnauthorized=onUnauthorized;
@@ -152,6 +157,15 @@ export class DriveAPI {
     // Best-effort conflict detection, not an atomic compare-and-swap.
     return (await this.request(`${upload}/${encodeURIComponent(id)}?uploadType=media&fields=id,name,version,modifiedTime`, {
       method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(content)
+    })).json();
+  }
+  async updateData(id, version, bytes) {
+    if (!(bytes instanceof Uint8Array) || bytes.byteLength > maxDataBytes) throw new Error('Data file exceeds 5 MiB.');
+    const current=validateDataMetadata(await this.metadata(id));
+    if(current.capabilities?.canEdit===false || !version || current.version!==version)
+      throw new Error('Remote file changed or is not writable. Keep the local copy and reopen from Drive.');
+    return (await this.request(`${upload}/${encodeURIComponent(id)}?uploadType=media&fields=id,name,version,modifiedTime,size`,{
+      method:'PATCH',headers:{'Content-Type':current.mimeType},body:bytes
     })).json();
   }
   async createData(name, bytes, parent) {
