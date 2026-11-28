@@ -9,6 +9,10 @@
 5. Esegui le celle dell'esercizio. I dati montati sono in sola lettura. I file sotto /drive/output/ sono temporanei: esportali o scaricali prima di chiudere.
 6. Da un altro dispositivo, collega lo stesso account, apri il notebook remoto, scegli Restore notebook data dependencies e riesegui il codice dall'inizio.
 
+## Modificare le celle anche su tablet
+
+Seleziona una cella Python: la barra Editing offre Complete, Help, Indent, Dedent, Undo e Redo. Esegui prima gli import per ottenere suggerimenti del kernel. Seleziona una cella Markdown: usa Edit Markdown per modificarla e Render Markdown per visualizzare il testo formattato senza eseguire codice Python. Non serve Ctrl.
+
 ## Se qualcosa non funziona
 
 - Authorization expired: scegli Renew authorization con lo stesso account.
