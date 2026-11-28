@@ -23,6 +23,7 @@ export class DriveSidebar extends Widget {
     this.commands=commands;this.state=state;
     this.lastState='';
     this.advancedOpen=false;
+    this.mode='files';
     this.timer=globalThis.setInterval(()=>this.refresh(),1000);
     this.refresh();
   }
@@ -31,10 +32,14 @@ export class DriveSidebar extends Widget {
     globalThis.clearInterval(this.timer);
     super.dispose();
   }
+  show(mode) {
+    this.mode=mode;
+    this.refresh();
+  }
   refresh() {
     if (this.isDisposed) return;
     const s=this.state();
-    const key=JSON.stringify(s);
+    const key=JSON.stringify([this.mode,s]);
     if (key===this.lastState) return;
     this.lastState=key;
     const body=element('div');
@@ -59,13 +64,66 @@ export class DriveSidebar extends Widget {
       b.addEventListener('click',()=>{void this.commands.execute('jupyterlite-google-drive:'+command,args);});
       return b;
     };
+    const connected=s.auth==='connected';
+    if(this.mode==='files') {
+      const path=element('h3',s.folderPath||'JupyterLite');
+      path.style.margin='4px 0';
+      body.append(path);
+      const toolbar=element('div');
+      Object.assign(toolbar.style,{display:'flex',gap:'4px',flexWrap:'wrap'});
+      const tool=(label,command,enabled,args={})=>{
+        const b=button(label,command,enabled,args);
+        b.style.width='auto';
+        toolbar.append(b);
+      };
+      tool('Up one folder','open-folder',connected&&s.canGoUp,{up:true});
+      tool('Refresh folder','refresh-list',connected);
+      tool('New folder','new-folder',connected);
+      body.append(toolbar);
+      if(!connected) {
+        body.append(element('p','Connect to Google Drive to browse your JupyterLite folder.'));
+      } else {
+        const list=element('div');
+        list.setAttribute('role','list');
+        list.setAttribute('aria-label','Folder contents');
+        Object.assign(list.style,{display:'flex',flexDirection:'column',gap:'2px'});
+        const files=[...s.files].sort((a,b)=>
+          Number(b.mimeType==='application/vnd.google-apps.folder')-Number(a.mimeType==='application/vnd.google-apps.folder') ||
+          a.name.localeCompare(b.name));
+        for(const file of files) {
+          const folder=file.mimeType==='application/vnd.google-apps.folder';
+          const notebook=/\.ipynb$/i.test(file.name)&&!file.mimeType?.startsWith('application/vnd.google-apps.');
+          const item=element('div');
+          item.setAttribute('role','listitem');
+          const label=(folder?'📁 ':notebook?'📓 ':'📄 ')+file.name+(file.readOnly?' (read-only)':'');
+          if(folder||notebook) {
+            const b=button(label,folder?'open-folder':'native-open',true,folder?{folderId:file.id}:{fileId:file.id});
+            b.setAttribute('aria-label',(folder?'Open folder ':'Open ')+file.name);
+            b.title=file.name;
+            b.style.overflowWrap='anywhere';
+            item.append(b);
+          } else {
+            const line=element('div',label);
+            Object.assign(line.style,{padding:'5px 8px',overflowWrap:'anywhere'});
+            item.append(line);
+          }
+          list.append(item);
+        }
+        body.append(list);
+        if(!files.length) body.append(element('div',s.busy?'Loading folder…':s.loaded?'No authorized files in this folder.':'Refresh to load the folder.'));
+        const note=element('div','Only files authorized for this app are visible.');
+        note.style.color='var(--jp-ui-font-color2)';
+        body.append(note);
+      }
+      this.node.replaceChildren(body);
+      return;
+    }
     const advanced=element('details');
     advanced.open=this.advancedOpen;
     advanced.addEventListener('toggle',()=>{this.advancedOpen=advanced.open;});
     const summary=element('summary','Advanced actions');
     summary.style.cursor='pointer';advanced.append(summary);
     const advancedBody=element('div');Object.assign(advancedBody.style,{display:'flex',flexDirection:'column',gap:'8px',paddingTop:'8px'});advanced.append(advancedBody);
-    const connected=s.auth==='connected';
     if(s.hasAccount) body.append(button('Renew authorization','renew',s.prepared));
     if(s.hasAccount)advancedBody.append(button('Switch Google account','connect',s.prepared));
     else body.append(button('Connect to Google Drive','connect',s.prepared));
@@ -90,24 +148,6 @@ export class DriveSidebar extends Widget {
     body.append(button('Save notebook as new Drive copy','save-as',connected&&s.hasNotebook));
     advancedBody.append(button('Save local recovery copy','recover',s.hasNotebook));
     body.append(button('Download notebook recovery file','download-notebook',s.hasNotebook));
-    section(s.folderPath || 'JupyterLite','Only authorized files are visible. Google Picker can grant access to other files.');
-    if(s.canGoUp) body.append(button('Up one folder','open-folder',connected,{up:true}));
-    body.append(button('Refresh folder','refresh-list',connected));
-    body.append(button('New folder','new-folder',connected));
-    body.append(button('Choose notebook from Drive…','native-open',connected));
-    if(connected) {
-      if(!s.files.length)body.append(element('div',s.loaded?'No authorized files in this folder.':'Open or refresh to load the folder.'));
-      for(const file of s.files) {
-        const item=element('div');
-        Object.assign(item.style,{borderTop:'1px solid var(--jp-border-color2)',paddingTop:'5px',overflowWrap:'anywhere'});
-        item.append(element('div',file.name+(file.readOnly?' (read-only)':'')));
-        const line=element('div',file.modified||'');
-        line.style.fontSize='var(--jp-ui-font-size0)';item.append(line);
-        if(file.mimeType==='application/vnd.google-apps.folder') item.append(button('Open folder '+file.name,'open-folder',true,{folderId:file.id}));
-        else if(/\.ipynb$/i.test(file.name) && !file.mimeType?.startsWith('application/vnd.google-apps.')) item.append(button('Open '+file.name,'native-open',true,{fileId:file.id}));
-        body.append(item);
-      }
-    }
     section('Mounted data','Read-only files under /drive/data/ in native notebooks.');
     body.append(button('Mount data file…','mount-data',connected&&s.isNative));
     advancedBody.append(button('Import temporary data copy…','import-data',connected&&s.hasNotebook));

@@ -38,7 +38,7 @@ def main():
                         expect(labels.filter(has_text=re.compile(r"^Google Drive \(advanced\)$"))).to_have_count(1)
                         expect(labels.filter(has_text=re.compile(r"^Google Drive:"))).to_have_count(0)
                         for title, menu_id, expected in [
-                            ("Google Drive (advanced)", "jupyterlite-google-drive-advanced-menu", ["Open notebook","Browse authorized notebooks","Save to original","Remove recorded data dependency","Remember mounted data in notebook","Import data into Python","Save local recovery copy","Download notebook recovery file","Download Python output locally","Disconnect"]),
+                            ("Google Drive (advanced)", "jupyterlite-google-drive-advanced-menu", ["Open notebook","Browse authorized notebooks","Save to original","Remove recorded data dependency","Remember mounted data in notebook","Import data into Python","Notebook and data status","Save local recovery copy","Download notebook recovery file","Download Python output locally","Disconnect"]),
                             ("Google Drive", "jupyterlite-google-drive-menu", ["Connect","Open folder","Renew authorization","Open native notebook (experimental)","Save a new copy","Refresh workspace list","New folder","Mount read-only data file (experimental)","Add selected data dependency","Restore notebook data dependencies","Export Python output as new file"])
                         ]:
                             labels.filter(has_text=re.compile("^"+re.escape(title)+"$")).hover()
@@ -54,6 +54,11 @@ def main():
                         expect(workspace).to_be_visible(timeout=30000)
                         expect(workspace.get_by_role("heading",name="Google Drive",exact=True)).to_be_visible()
                         expect(workspace.get_by_role("status")).to_contain_text("Configuration unavailable",timeout=30000)
+                        expect(workspace.get_by_role("heading",name="Current notebook")).to_have_count(0)
+                        expect(workspace.get_by_role("button",name="Refresh folder")).to_be_disabled()
+                        page.locator(".lm-MenuBar-item").filter(has_text="File").first.click()
+                        page.locator(".lm-Menu:visible").first.get_by_text("Google Drive (advanced)",exact=True).hover()
+                        page.locator("#jupyterlite-google-drive-advanced-menu").get_by_text("Notebook and data status",exact=True).click()
                         expect(workspace.get_by_role("button",name="Connect to Google Drive")).to_be_disabled()
                         advanced=workspace.locator("details").filter(has_text="Advanced actions")
                         expect(advanced).to_be_visible()

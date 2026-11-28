@@ -2,7 +2,7 @@
 
 A browser-only JupyterLab extension for JupyterLite that connects Python notebooks and their data to Google Drive. Work in a web browser, keep notebooks on Drive, and resume work on another device. No JupyterLite fork, application backend, or local Python installation is required for end users.
 
-**Current version: 0.6.0-beta.8 (experimental candidate).** Built for JupyterLite 0.9.0b2, JupyterLab 4.7.0b2, Pyodide kernel 0.9.0b0 and Lumino Widgets 2.10.0.
+**Current version: 0.6.0-beta.9 (experimental candidate).** Built for JupyterLite 0.9.0b2, JupyterLab 4.7.0b2, Pyodide kernel 0.9.0b0 and Lumino Widgets 2.10.0.
 
 **[Open the live demo](https://lmari.github.io/jupyterlite-google-drive/lab/index.html)** · [Student quickstart (Italian)](docs/student-quickstart-it.md) · [Install the extension](docs/distribution.md) · [Google Cloud setup](#google-cloud-setup)
 
@@ -305,3 +305,5 @@ Priorities are real-account and tablet acceptance, usability for touch devices, 
 - [Google OAuth policies](https://developers.google.com/identity/protocols/oauth2/policies)
 
 License: [BSD 3-Clause](LICENSE).
+
+**Folder browser (beta 9):** File > Google Drive > Open folder displays only the folder contents and navigation controls. To view save status, mounted data, dependencies and local recovery actions, use File > Google Drive (advanced) > Notebook and data status.

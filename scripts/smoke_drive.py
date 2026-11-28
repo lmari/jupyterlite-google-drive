@@ -157,7 +157,7 @@ def edit_cell(page, cell, text):
     expect(cell).to_have_text(text)
 
 def command(page, label):
-    advanced = ["Open notebook","Browse authorized notebooks","Save to original","Remove recorded data dependency","Remember mounted data in notebook","Import data into Python","Save local recovery copy","Download notebook recovery file","Download Python output locally","Disconnect"]
+    advanced = ["Notebook and data status","Open notebook","Browse authorized notebooks","Save to original","Remove recorded data dependency","Remember mounted data in notebook","Import data into Python","Save local recovery copy","Download notebook recovery file","Download Python output locally","Disconnect"]
     is_advanced = label in advanced
     title = "Google Drive (advanced)" if is_advanced else "Google Drive"
     menu_id = "jupyterlite-google-drive-advanced-menu" if is_advanced else "jupyterlite-google-drive-menu"
@@ -268,7 +268,7 @@ def main():
                         dialog(a, "Opened native notebook")
                         cell = a.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
                         expect(cell).to_have_text("6 * 7")
-                        command(a, "Open folder")
+                        command(a, "Notebook and data status")
                         workspace=a.locator("#jupyterlite-google-drive-sidebar")
                         save_state=workspace.locator("[data-save-state]")
                         cell.click()

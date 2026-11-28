@@ -54,6 +54,10 @@ def main():
                         command(page,"Open folder")
                         workspace=page.locator("#jupyterlite-google-drive-sidebar")
                         expect(workspace.get_by_role("status")).to_have_text("Authorized")
+                        expect(workspace.get_by_role("heading",name="Current notebook")).to_have_count(0)
+                        expect(workspace.get_by_role("heading",name="Mounted data")).to_have_count(0)
+                        expect(workspace.get_by_role("heading",name="Python output")).to_have_count(0)
+                        expect(workspace.get_by_role("list",name="Folder contents")).to_be_visible()
                         expect(workspace.get_by_role("button",name="Open folder Exercises",exact=True)).to_be_enabled(timeout=30000)
                         workspace.get_by_role("button",name="Open folder Exercises",exact=True).click()
                         expect(workspace.get_by_role("heading",name="JupyterLite / Exercises",exact=True)).to_be_visible(timeout=30000)
@@ -63,6 +67,7 @@ def main():
                         workspace.get_by_role("button",name="Open remote.ipynb",exact=True).click()
                         dialog(page,"Experimental remote editor")
                         dialog(page,"Opened native notebook")
+                        command(page,"Notebook and data status")
                         cell=page.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
                         expect(cell).to_have_text("40 + 2")
                         page.evaluate("window.__drivePickId = 'data-file'")
@@ -102,7 +107,7 @@ def main():
                         print("Python output exported as a new binary file, without overwriting Drive data.")
                         # Expired token, wrong account, then same-account renewal.
                         fake.expire_original_token=True
-                        workspace.get_by_role("button",name="Refresh folder").click()
+                        command(page,"Refresh workspace list")
                         dialog(page,"Drive request failed (401)")
                         expect(workspace.get_by_role("status")).to_have_text("Authorization expired")
                         assert page.evaluate("!window.dispatchEvent(new Event('beforeunload',{cancelable:true}))")
@@ -171,7 +176,7 @@ def main():
                         command(page,"Open native notebook (experimental)")
                         dialog(page,"Experimental remote editor")
                         dialog(page,"Opened native notebook")
-                        command(page,"Open folder")
+                        command(page,"Notebook and data status")
                         workspace=page.locator("#jupyterlite-google-drive-sidebar")
                         expect(workspace.get_by_text("Recorded: /drive/data/dati.csv",exact=True)).to_be_visible()
                         expect(workspace.locator("[data-dependency-state]")).to_have_attribute("data-dependency-state","not-mounted")

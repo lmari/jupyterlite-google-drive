@@ -80,7 +80,7 @@ const plugin = {
       const enabled=()=>!busy && (name==='connect'?prepared:
         name==='renew'?prepared&&auth.hasAccount:
         name==='disconnect'?auth.hasAccount:
-        ['recover','download-notebook','download-output'].includes(name)?true:auth.status==='connected');
+        ['recover','download-notebook','download-output','notebook-status'].includes(name)?true:auth.status==='connected');
       app.commands.addCommand(id, {label:args=>args.inDriveMenu?label.replace(/^Google Drive: /,''):label, isEnabled:enabled, execute:args=>enabled()?run(fn)(args):undefined});
       return {command: id};
     };
@@ -373,8 +373,13 @@ const plugin = {
         folders.push(child);
       }
       authorizedFiles=[];listLoaded=false;
+      sidebar.show('files');
       app.shell.activateById(sidebar.id);
       await loadFolder();
+    });
+    const notebookStatus=add('notebook-status','Google Drive: Notebook and data status',async()=>{
+      sidebar.show('status');
+      app.shell.activateById(sidebar.id);
     });
     const newFolder=add('new-folder','Google Drive: New folder',async()=>{
       const result=await InputDialog.getText({title:'New folder',label:'Folder name',okLabel:'Create'});
@@ -425,7 +430,7 @@ const plugin = {
     const advancedMenu=buildMenu('jupyterlite-google-drive-advanced-menu','Google Drive (advanced)',[
       [open,browse,save],
       [removeDataDependency,rememberData,importData],
-      [recover,downloadNotebook,downloadOutput],
+      [notebookStatus,recover,downloadNotebook,downloadOutput],
       [disconnect]
     ]);
     menu.fileMenu.addGroup([
