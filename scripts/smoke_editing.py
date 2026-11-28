@@ -94,10 +94,10 @@ def main():
                         refresh=variables.get_by_role("button",name="Refresh variables")
                         refresh.tap()
                         table=variables.get_by_role("table",name="Variable snapshot")
-                        expect(table.get_by_role("row").filter(has_text="dati")).to_contain_text("[2, 4, 6, 8, 10]",timeout=30000)
-                        expect(table.get_by_role("row").filter(has_text="media")).to_contain_text("6.0")
-                        expect(table.get_by_role("row").filter(has_text="obj")).to_contain_text("<object>")
-                        expect(table.get_by_role("row").filter(has_text="media")).to_contain_text("float")
+                        expect(table.get_by_role("row").filter(has=page.get_by_role("cell",name="dati",exact=True))).to_contain_text("[2, 4, 6, 8, 10]",timeout=30000)
+                        expect(table.get_by_role("row").filter(has=page.get_by_role("cell",name="media",exact=True))).to_contain_text("6.0")
+                        expect(table.get_by_role("row").filter(has=page.get_by_role("cell",name="obj",exact=True))).to_contain_text("<object>")
+                        expect(table.get_by_role("row").filter(has=page.get_by_role("cell",name="media",exact=True))).to_contain_text("float")
                         expect(page.locator(".jp-Notebook:visible .jp-CodeCell")).to_have_count(1)
                         # Changed value must not be silently presented as a fresh snapshot.
                         code.tap()
@@ -107,7 +107,7 @@ def main():
                         expect(page.locator(".jp-Notebook:visible .jp-CodeCell .jp-OutputArea-output").first).to_have_text("12.0",timeout=60000)
                         expect(variables.get_by_role("status")).to_contain_text("outdated")
                         refresh.tap()
-                        expect(table.get_by_role("row").filter(has_text="media")).to_contain_text("12.0",timeout=30000)
+                        expect(table.get_by_role("row").filter(has=page.get_by_role("cell",name="media",exact=True))).to_contain_text("12.0",timeout=30000)
                         print("Touch editing tools verified: Markdown render, indentation, completion, help, undo/redo and explicit variable snapshots.")
                     except Exception:
                         print("Visible dialogs:",page.locator(".jp-Dialog:visible").all_text_contents())
