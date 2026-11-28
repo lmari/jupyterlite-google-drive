@@ -1,6 +1,8 @@
 const base = 'https://www.googleapis.com/drive/v3/files';
 const upload = 'https://www.googleapis.com/upload/drive/v3/files';
 export const maxDataBytes = 5 * 1024 * 1024;
+export const folderMime = 'application/vnd.google-apps.folder';
+const quote = value => "'" + String(value).replace(/\\/g,'\\\\').replace(/'/g,"\\'") + "'";
 export const scope = 'https://www.googleapis.com/auth/drive.file';
 export function validateNotebook(value) {
   if (!value || value.nbformat !== 4 || !Array.isArray(value.cells) ||
@@ -67,6 +69,37 @@ export class DriveAPI {
     } while (pageToken);
     return [...notebooks.values()];
   }
+  async listFolder(parent, extra = '') {
+    const files = new Map(), seen = new Set();
+    let pageToken;
+    do {
+      const params = new URLSearchParams({
+        q: "trashed = false and " + quote(parent) + " in parents" + extra,
+        spaces:'drive', corpora:'user', pageSize:'100',
+        orderBy:'folder,name', fields:'nextPageToken,incompleteSearch,files(id,name,mimeType,modifiedTime,capabilities(canEdit))'
+      });
+      if(pageToken) params.set('pageToken',pageToken);
+      const page = await (await this.request(base+'?'+params)).json();
+      if(page.incompleteSearch) throw new Error('Google Drive returned an incomplete search. Retry.');
+      for(const f of page.files ?? []) if(f.id && f.name) files.set(f.id,f);
+      pageToken=page.nextPageToken;
+      if(pageToken && seen.has(pageToken)) throw new Error('Drive repeated a page token; retry the listing.');
+      if(pageToken) seen.add(pageToken);
+    } while(pageToken);
+    return [...files.values()];
+  }
+  async createFolder(name,parent='root') {
+    return (await this.request(base+'?fields=id,name,mimeType',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name,mimeType:folderMime,parents:[parent]})
+    })).json();
+  }
+  async workspaceRoot() {
+    const folders=(await this.listFolder('root'," and mimeType = "+quote(folderMime)+" and name = 'JupyterLite'"))
+      .filter(f=>f.name==='JupyterLite' && f.mimeType===folderMime);
+    if(folders.length>1) throw new Error('Multiple authorized JupyterLite folders in My Drive. Rename duplicates in Google Drive before continuing.');
+    return folders[0] ?? await this.createFolder('JupyterLite');
+  }
   async metadata(id) {
     return (await this.request(`${base}/${encodeURIComponent(id)}?fields=id,name,version,modifiedTime,trashed,mimeType,size,capabilities(canEdit)`)).json();
   }
@@ -121,7 +154,7 @@ export class DriveAPI {
       method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(content)
     })).json();
   }
-  async createData(name, bytes) {
+  async createData(name, bytes, parent) {
     if (typeof name !== 'string' || !/^[A-Za-z0-9_][A-Za-z0-9._-]{0,179}$/.test(name) ||
         /\.ipynb$/i.test(name) || !(bytes instanceof Uint8Array) || bytes.byteLength > maxDataBytes) {
       throw new Error('Invalid output filename or data exceeds 5 MiB.');
@@ -132,18 +165,18 @@ export class DriveAPI {
     const boundary = 'data_' + globalThis.crypto.randomUUID();
     // Blob preserves every byte; never stringify or UTF-8 decode binary data.
     const head = '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' +
-      JSON.stringify({name,mimeType}) + '\r\n--' + boundary + '\r\nContent-Type: ' + mimeType + '\r\n\r\n';
+      JSON.stringify({name,mimeType,...(parent?{parents:[parent]}:{})}) + '\r\n--' + boundary + '\r\nContent-Type: ' + mimeType + '\r\n\r\n';
     const body = new Blob([head,bytes,'\r\n--' + boundary + '--\r\n']);
     // POST always creates a new file, even if another file has the same name.
     return (await this.request(`${upload}?uploadType=multipart&fields=id,name,version,modifiedTime,size`, {
       method:'POST',headers:{'Content-Type':`multipart/related; boundary=${boundary}`},body
     })).json();
   }
-  async create(name, content) {
+  async create(name, content, parent) {
     validateNotebook(content);
     const boundary = 'notebook_' + globalThis.crypto.randomUUID();
     const body = [ `--${boundary}`, 'Content-Type: application/json; charset=UTF-8', '',
-      JSON.stringify({name: notebookName(name), mimeType: 'application/json'}),
+      JSON.stringify({name: notebookName(name), mimeType: 'application/json', ...(parent?{parents:[parent]}:{})}),
       `--${boundary}`, 'Content-Type: application/json', '', JSON.stringify(content),
       `--${boundary}--`, '' ].join('\r\n');
     return (await this.request(`${upload}?uploadType=multipart&fields=id,name,version,modifiedTime`, {

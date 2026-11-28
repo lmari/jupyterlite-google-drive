@@ -90,18 +90,21 @@ export class DriveSidebar extends Widget {
     body.append(button('Save notebook as new Drive copy','save-as',connected&&s.hasNotebook));
     advancedBody.append(button('Save local recovery copy','recover',s.hasNotebook));
     body.append(button('Download notebook recovery file','download-notebook',s.hasNotebook));
-    section('Authorized notebooks','Only files already authorized for this app. Select additional files with Google Picker.');
-    body.append(button('Refresh notebook list','refresh-list',connected));
+    section(s.folderPath || 'JupyterLite','Only authorized files are visible. Google Picker can grant access to other files.');
+    if(s.canGoUp) body.append(button('Up one folder','open-folder',connected,{up:true}));
+    body.append(button('Refresh folder','refresh-list',connected));
+    body.append(button('New folder','new-folder',connected));
     body.append(button('Choose notebook from Drive…','native-open',connected));
     if(connected) {
-      if(!s.files.length)body.append(element('div',s.loaded?'No authorized notebooks.':'Refresh to load the list.'));
+      if(!s.files.length)body.append(element('div',s.loaded?'No authorized files in this folder.':'Open or refresh to load the folder.'));
       for(const file of s.files) {
         const item=element('div');
         Object.assign(item.style,{borderTop:'1px solid var(--jp-border-color2)',paddingTop:'5px',overflowWrap:'anywhere'});
         item.append(element('div',file.name+(file.readOnly?' (read-only)':'')));
         const line=element('div',file.modified||'');
         line.style.fontSize='var(--jp-ui-font-size0)';item.append(line);
-        item.append(button('Open '+file.name,'native-open',true,{fileId:file.id}));
+        if(file.mimeType==='application/vnd.google-apps.folder') item.append(button('Open folder '+file.name,'open-folder',true,{folderId:file.id}));
+        else if(/\\.ipynb$/i.test(file.name) && !file.mimeType?.startsWith('application/vnd.google-apps.')) item.append(button('Open '+file.name,'native-open',true,{fileId:file.id}));
         body.append(item);
       }
     }

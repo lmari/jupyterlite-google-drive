@@ -7,7 +7,7 @@ import {Menu} from '@lumino/widgets';
 import editingTools from './editing-tools.js';
 import variableInspector from './variable-inspector.js';
 import {GoogleAuth} from './auth.js';
-import {DriveAPI, notebookName} from './drive-api.js';
+import {DriveAPI, notebookName, folderMime} from './drive-api.js';
 import {NativeDrive} from './native-drive.js';
 import {dataPath, transferData} from './kernel-data.js';
 import {DriveSidebar} from './sidebar.js';
@@ -23,9 +23,18 @@ const plugin = {
       apiKey: PageConfig.getOption('googleDriveApiKey'), appId: PageConfig.getOption('googleDriveAppId')});
     const drive = new DriveAPI(() => auth.token(),undefined,token=>auth.invalidate(token));
     let links = new WeakMap(); let busy = false; let prepared = false; let preparationError = '';
-    let sidebar; let authorizedFiles = []; let listLoaded = false;
-    const refreshSidebar = () => sidebar?.refresh();
-    const clearList = () => { authorizedFiles=[]; listLoaded=false; };
+    let sidebar; let authorizedFiles = []; let listLoaded = false; let folders=[]; const commandIds=[];
+    const refreshSidebar = () => { sidebar?.refresh(); for(const id of commandIds) app.commands.notifyCommandChanged(id); };
+    const clearList = () => { authorizedFiles=[]; listLoaded=false; folders=[]; };
+    const ensureFolder = async () => {
+      if(!folders.length) folders=[await drive.workspaceRoot()];
+      return folders.at(-1);
+    };
+    const loadFolder = async () => {
+      const folder=await ensureFolder();
+      authorizedFiles=await drive.listFolder(folder.id);
+      listLoaded=true;
+    };
     const tell = (title, body) => showDialog({title, body, buttons: [Dialog.okButton()]});
     const contents = app.serviceManager.contents;
     const native = new NativeDrive(drive);
@@ -67,7 +76,12 @@ const plugin = {
     };
     const add = (name, label, fn) => {
       const id = 'jupyterlite-google-drive:' + name;
-      app.commands.addCommand(id, {label:args=>args.inDriveMenu?label.replace(/^Google Drive: /,''):label, execute: run(fn)});
+      commandIds.push(id);
+      const enabled=()=>!busy && (name==='connect'?prepared:
+        name==='renew'?prepared&&auth.hasAccount:
+        name==='disconnect'?auth.hasAccount:
+        ['recover','download-notebook','download-output'].includes(name)?true:auth.status==='connected');
+      app.commands.addCommand(id, {label:args=>args.inDriveMenu?label.replace(/^Google Drive: /,''):label, isEnabled:enabled, execute:args=>enabled()?run(fn)(args):undefined});
       return {command: id};
     };
     const connect = add('connect', 'Google Drive: Connect', async () => {
@@ -75,7 +89,7 @@ const plugin = {
       requireClosed();
       if (!(await confirmOutputDiscard())) return;
       await auth.connect(); links = new WeakMap(); native.reset(); clearList();
-      await tell('Google Drive', 'Connected. Choose Open from Drive or Save a new copy to Drive.');
+      await tell('Google Drive', 'Connected. Choose Open folder to browse JupyterLite.');
     });
     const renew = add('renew','Google Drive: Renew authorization',async()=>{
       if (!prepared) throw new Error(preparationError || 'Google libraries are loading. Retry shortly.');
@@ -176,9 +190,11 @@ const plugin = {
       const nativePath=panel.context.path.startsWith(native.name+':');
       const info=nativePath?native.saveInfo(contents.localPath(panel.context.path)):null;
       const name = notebookName(info?.name || panel.context.path.split('/').pop());
-      const meta = await drive.create(name, panel.context.model.toJSON());
+      const folder=await ensureFolder();
+      const meta = await drive.create(name, panel.context.model.toJSON(),folder.id);
+      await loadFolder();
       if (!nativePath) links.set(panel, {id: meta.id, name: meta.name, version: meta.version});
-      await tell('Google Drive', `Created ${meta.name} in My Drive.`+(nativePath?' Standard Save still targets the originally opened notebook.':''));
+      await tell('Google Drive', `Created ${meta.name} in JupyterLite (${folder.name}).`+(nativePath?' Standard Save still targets the originally opened notebook.':''));
     });
     const recover = add('recover', 'Google Drive: Save local recovery copy', async () => {
       const panel = current();
@@ -332,11 +348,13 @@ const plugin = {
       if (!result.button.accept) return;
       const {name,bytes} = native.outputSnapshot(result.value);
       const answer = await showDialog({title:'Create new file on Google Drive?',
-        body:`Upload ${name} (${bytes.length} bytes) to My Drive? This creates a new file and never overwrites an existing Drive file. The temporary source remains available.`,
+        body:`Upload ${name} (${bytes.length} bytes) to the current JupyterLite folder? This creates a new file and never overwrites an existing Drive file. The temporary source remains available.`,
         buttons:[Dialog.cancelButton(),Dialog.okButton({label:'Upload'})]});
       if (!answer.button.accept) return;
-      const meta = await drive.createData(name,bytes);
-      await tell('Google Drive',`Created ${meta.name} in My Drive.`);
+      const folder=await ensureFolder();
+      const meta = await drive.createData(name,bytes,folder.id);
+      await loadFolder();
+      await tell('Google Drive',`Created ${meta.name} in JupyterLite (${folder.name}).`);
     });
     const disconnect = add('disconnect', 'Google Drive: Disconnect', async () => {
       requireClosed();
@@ -345,7 +363,27 @@ const plugin = {
       await tell('Google Drive', 'Disconnected. Local notebook copies remain in this browser.');
     });
     const refreshList=add('refresh-list','Google Drive: Refresh workspace list',async()=>{
-      authorizedFiles=await drive.listNotebooks();listLoaded=true;
+      await loadFolder();
+    });
+    const openFolder=add('open-folder','Google Drive: Open folder',async(args={})=>{
+      if(args.up && folders.length>1) folders.pop();
+      else if(args.folderId) {
+        const child=authorizedFiles.find(f=>f.id===args.folderId && f.mimeType===folderMime);
+        if(!child) throw new Error('Refresh the folder first.');
+        folders.push(child);
+      }
+      authorizedFiles=[];listLoaded=false;
+      app.shell.activateById(sidebar.id);
+      await loadFolder();
+    });
+    const newFolder=add('new-folder','Google Drive: New folder',async()=>{
+      const result=await InputDialog.getText({title:'New folder',label:'Folder name',okLabel:'Create'});
+      const name=result.value?.trim();
+      if(!result.button.accept || !name) return;
+      if(name.includes('/') || name==='.' || name==='..') throw new Error('Invalid folder name.');
+      const folder=await ensureFolder();
+      await drive.createFolder(name,folder.id);
+      await loadFolder();
     });
     sidebar=new DriveSidebar(app.commands,()=>{
       const panel=tracker.currentWidget;
@@ -360,14 +398,13 @@ const plugin = {
         current:!hasNotebook?'No active notebook':isNative?'Remote notebook — standard Save and autosave write to Drive':
           links.has(panel)?'Local copy — explicit Save to original writes to Drive':'Local notebook — browser storage',
         files:auth.status==='connected'?authorizedFiles.map(f=>({id:f.id,name:f.name,readOnly:f.capabilities?.canEdit===false,
-          modified:f.modifiedTime?new Date(f.modifiedTime).toLocaleString():''})):[],
-        loaded:listLoaded,data:native.listData(),outputs:native.listOutputs()};
+          mimeType:f.mimeType, modified:f.modifiedTime?new Date(f.modifiedTime).toLocaleString():''})):[],
+        folderPath:folders.map(f=>f.name).join(' / '),canGoUp:folders.length>1,loaded:listLoaded,data:native.listData(),outputs:native.listOutputs()};
     });
     app.shell.add(sidebar,'left',{rank:700});
     tracker.currentChanged.connect(refreshSidebar);
     native.fileChanged.connect(refreshSidebar);
-    const showPanel='jupyterlite-google-drive:show-panel';
-    app.commands.addCommand(showPanel,{label:args=>args.inDriveMenu?'Show workspace':'Google Drive: Show workspace',execute:()=>app.shell.activateById(sidebar.id)});
+
     // Two compact File entries. Keep the ordinary native workflow separate
     // from account switching, legacy local-copy and recovery operations.
     const buildMenu=(id,title,groups)=>{
@@ -381,8 +418,8 @@ const plugin = {
       return submenu;
     };
     const driveMenu=buildMenu('jupyterlite-google-drive-menu','Google Drive',[
-      [{command:showPanel},connect,renew],
-      [nativeOpen,saveAs],
+      [connect,openFolder,renew],
+      [nativeOpen,saveAs,refreshList,newFolder],
       [mountData,addDataDependency,restoreData,exportData]
     ]);
     const advancedMenu=buildMenu('jupyterlite-google-drive-advanced-menu','Google Drive (advanced)',[

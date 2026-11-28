@@ -39,14 +39,17 @@ def main():
                         expect(labels.filter(has_text=re.compile(r"^Google Drive:"))).to_have_count(0)
                         for title, menu_id, expected in [
                             ("Google Drive (advanced)", "jupyterlite-google-drive-advanced-menu", ["Open notebook","Browse authorized notebooks","Save to original","Remove recorded data dependency","Remember mounted data in notebook","Import data into Python","Save local recovery copy","Download notebook recovery file","Download Python output locally","Disconnect"]),
-                            ("Google Drive", "jupyterlite-google-drive-menu", ["Show workspace","Connect","Renew authorization","Open native notebook (experimental)","Save a new copy","Mount read-only data file (experimental)","Add selected data dependency","Restore notebook data dependencies","Export Python output as new file"])
+                            ("Google Drive", "jupyterlite-google-drive-menu", ["Connect","Open folder","Renew authorization","Open native notebook (experimental)","Save a new copy","Refresh workspace list","New folder","Mount read-only data file (experimental)","Add selected data dependency","Restore notebook data dependencies","Export Python output as new file"])
                         ]:
                             labels.filter(has_text=re.compile("^"+re.escape(title)+"$")).hover()
                             submenu=page.locator("#"+menu_id)
                             expect(submenu).to_be_visible(timeout=30000)
                             items=submenu.locator(".lm-Menu-itemLabel").filter(has_text=re.compile(r"\S"))
                             expect(items).to_have_text(expected)
-                        page.locator("#jupyterlite-google-drive-menu").get_by_text("Show workspace",exact=True).click()
+                        expect(page.locator("#jupyterlite-google-drive-menu .lm-Menu-item").filter(has_text="Open folder")).to_have_class(re.compile("lm-mod-disabled"))
+                        page.keyboard.press("Escape")
+                        page.keyboard.press("Escape")
+                        page.locator(".lm-TabBar-tab").filter(has_text=re.compile(r"^Drive$")).first.click()
                         workspace=page.locator("#jupyterlite-google-drive-sidebar")
                         expect(workspace).to_be_visible(timeout=30000)
                         expect(workspace.get_by_role("heading",name="Google Drive",exact=True)).to_be_visible()
@@ -70,7 +73,7 @@ def main():
                             output=page.locator(".jp-Notebook:visible .jp-CodeCell .jp-OutputArea-output").first
                             expect(output).to_have_text("6",timeout=180000)
                             print("Installed wheel site executed the real Python kernel.")
-                        print("JupyterLite notebook, two Drive submenus with nineteen commands and collapsible advanced actions are verified.")
+                        print("JupyterLite notebook, two Drive submenus with connection-aware commands and collapsible advanced actions are verified.")
                     except Exception:
                         print("Visible JupyterLab dialogs:",page.locator(".jp-Dialog:visible").all_text_contents())
                         page.screenshot(path=str(root / "smoke-failure.png"), full_page=True)
