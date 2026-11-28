@@ -2,13 +2,13 @@
 
 A browser-only JupyterLab extension for JupyterLite that connects Python notebooks and their data to Google Drive. Work in a web browser, keep notebooks on Drive, and resume work on another device. No JupyterLite fork, application backend, or local Python installation is required for end users.
 
-**Current version: 0.6.0-beta.3 (experimental).** Built for JupyterLite 0.9.0b2, JupyterLab 4.7.0b2, Pyodide kernel 0.9.0b0 and Lumino Widgets 2.10.0.
+**Current version: 0.6.0-beta.4 (experimental candidate).** Built for JupyterLite 0.9.0b2, JupyterLab 4.7.0b2, Pyodide kernel 0.9.0b0 and Lumino Widgets 2.10.0.
 
 **[Open the live demo](https://lmari.github.io/jupyterlite-google-drive/lab/index.html)** · [Student quickstart (Italian)](docs/student-quickstart-it.md) · [Install the extension](docs/distribution.md) · [Google Cloud setup](#google-cloud-setup)
 
 ## Status and scope
 
-The current version passed [47 unit tests, browser integration tests and independent wheel installation](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45911431859), including actual Python execution and both JupyterLite filesystem transports. The GitHub Pages deployment succeeded. [Comparative touch tests](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45910895067) also passed in touch-enabled Chromium and Firefox after the runtime upgrade. These tests use desktop browser engines and mocked Google services, not physical tablets or real Google accounts. A real Google account has been used successfully during development; full acceptance of the current release remains outstanding.
+The preceding validated deployment passed [47 unit tests, browser integration tests and independent wheel installation](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45911431859), including actual Python execution and both JupyterLite filesystem transports. The GitHub Pages deployment succeeded. [Comparative touch tests](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45910895067) also passed in touch-enabled Chromium and Firefox after the runtime upgrade. These tests use desktop browser engines and mocked Google services, not physical tablets or real Google accounts. A real Google account has been used successfully during development; full acceptance of the current release remains outstanding.
 
 This is an experimental classroom candidate. Use disposable notebooks and non-sensitive data; do not rely on it for production, sensitive information or collaborative editing. See the [real-account acceptance checklist](docs/acceptance.md).
 
@@ -25,6 +25,10 @@ If you are using an existing deployment, the site operator must configure Google
 7. For input files and output files, follow the workflows below. To resume on another device, authorize the same account, open the remote notebook and explicitly restore its recorded data dependencies.
 
 Use the sidebar for routine operations. The **File > Google Drive** submenu provides everyday commands; **File > Google Drive (advanced)** contains local-copy, recovery and other less frequent operations. Both contain the same underlying commands used by the sidebar.
+
+## Notebook editing tools
+
+A separate frontend plugin, packaged with the Drive extension, adds a compact editing toolbar to every notebook, including unconfigured local notebooks. Select a code cell to use **Complete**, **Help**, **Indent**, **Dedent**, **Undo** and **Redo**. Complete uses JupyterLab's native completion provider; execute imports first so the Python kernel can inspect available objects. Help sends a native kernel inspection request for the object at the cursor and opens its documentation in a touch-friendly dialog. Select a Markdown cell to use **Edit Markdown** or **Render Markdown** without a physical keyboard; rendering affects only the active Markdown cell, never adjacent Python code. The plugin uses native CodeMirror commands and JupyterLab services, not an external AI or language server. Availability of completions and documentation depends on the kernel. Physical tablet acceptance remains pending.
 
 ## Notebook persistence
 
@@ -246,6 +250,7 @@ npm test
 python scripts/build_demo.py
 python -m playwright install chromium firefox
 python scripts/smoke_browser.py
+python scripts/smoke_editing.py
 python scripts/smoke_drive.py
 python scripts/smoke_mount.py
 python scripts/smoke_mount.py --transport service-worker
