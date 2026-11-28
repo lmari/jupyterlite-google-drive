@@ -17,9 +17,13 @@ def run(engine,name,url):
         bar=page.get_by_role("toolbar",name="Notebook editing tools")
         expect(bar).to_be_visible(timeout=120000)
         button=bar.get_by_role("button",name="Variables",exact=True)
-        # Variables must open from a Markdown cell too, without depending
-        # on any visible right sidebar or on a running Python kernel.
+        # Python tools must be absent in Markdown and available in a code cell.
         page.locator(".jp-Notebook:visible .jp-MarkdownCell").first.tap()
+        expect(button).to_have_count(0)
+        expect(bar.get_by_role("button",name="Run",exact=True)).to_have_count(0)
+        code=page.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
+        code.tap()
+        expect(bar.get_by_role("button").first).to_have_text("Run")
         button.tap()
         dialog=page.locator(".jp-Dialog:visible").filter(has_text="Python variables")
         expect(dialog).to_be_visible()
@@ -30,7 +34,7 @@ def run(engine,name,url):
         code.tap()
         page.keyboard.press("Control+a")
         page.keyboard.insert_text("tablet_value = 42\nprint(tablet_value)")
-        page.keyboard.press("Control+Enter")
+        bar.get_by_role("button",name="Run",exact=True).tap()
         expect(page.locator(".jp-Notebook:visible .jp-CodeCell .jp-OutputArea-output").first).to_have_text("42",timeout=180000)
         button.tap()
         expect(dialog).to_be_visible()

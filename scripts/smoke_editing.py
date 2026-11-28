@@ -32,6 +32,8 @@ def main():
                         expect(bar).to_be_visible(timeout=120000)
                         md=page.locator(".jp-Notebook:visible .jp-MarkdownCell").first
                         md.tap()
+                        expect(bar.get_by_role("button",name="Variables",exact=True)).to_have_count(0)
+                        expect(bar.get_by_role("button",name="Run",exact=True)).to_have_count(0)
                         edit=bar.get_by_role("button",name="Edit Markdown",exact=True)
                         expect(edit).to_be_enabled()
                         # Verify the actual hit target, not merely CSS visibility.
@@ -43,7 +45,8 @@ def main():
                         expect(md.locator(".cm-content")).to_be_hidden()
                         code=page.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
                         code.tap()
-                        page.keyboard.press("Control+Enter") # setup: import statistics
+                        expect(bar.get_by_role("button").first).to_have_text("Run")
+                        bar.get_by_role("button",name="Run",exact=True).tap() # setup: import statistics
                         expect(page.locator(".jp-Notebook:visible .jp-CodeCell .jp-OutputArea-output").first).to_have_text("6",timeout=180000)
                         code.tap()
                         page.keyboard.press("Control+a")

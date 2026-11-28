@@ -1,5 +1,5 @@
 // Independent notebook editing plugin: no Drive authorization or storage dependency.
-import {INotebookTracker} from '@jupyterlab/notebook';
+import {INotebookTracker,NotebookActions} from '@jupyterlab/notebook';
 import {showDialog,Dialog} from '@jupyterlab/apputils';
 import {Text} from '@jupyterlab/coreutils';
 import {Widget} from '@lumino/widgets';
@@ -165,6 +165,12 @@ function install(app,panel,help) {
     cell.editor?.focus();
     return cell.editor;
   };
+  button('Run','Run the active Python cell without advancing',async cell=>{
+    if(!cell||cell.model.type!=='code'||notebook.viewOnly||panel.isDisposed)return;
+    app.shell.activateById(panel.id);
+    // Explicit cell list: do not run any other selected cells.
+    await NotebookActions.runCells(notebook,[cell],panel.sessionContext);
+  });
   button('Complete','Show code completion suggestions at the cursor (Ctrl+Space)',async cell=>{
     if(await focusCode(cell))await app.commands.execute(COMPLETE);
   });
@@ -216,7 +222,10 @@ function install(app,panel,help) {
       b.hidden=!code;
       b.disabled=!editable||(name==='Complete'&&!app.commands.hasCommand(COMPLETE));
     }
-    buttons.get('Variables').hidden=!app.commands.hasCommand('jupyterlite-touch-tools:show-variables');
+    const run=buttons.get('Run');
+    run.hidden=!code;
+    run.disabled=!!notebook.viewOnly;
+    buttons.get('Variables').hidden=!code||!app.commands.hasCommand('jupyterlite-touch-tools:show-variables');
     for(const name of ['Edit Markdown','Render Markdown']){
       const b=buttons.get(name);b.hidden=!markdown;b.disabled=!editable;
     }
