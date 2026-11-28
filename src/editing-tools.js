@@ -3,7 +3,7 @@ import {INotebookTracker} from '@jupyterlab/notebook';
 import {showDialog,Dialog} from '@jupyterlab/apputils';
 import {Text} from '@jupyterlab/coreutils';
 import {Widget} from '@lumino/widgets';
-import {indentMore, indentLess, undo, redo} from '@codemirror/commands';
+import {indentMore, indentLess} from '@codemirror/commands';
 
 const COMPLETE='completer:invoke-notebook';
 
@@ -103,14 +103,26 @@ function install(app,panel) {
       maxHeight:'55vh',maxWidth:'70vw',overflow:'auto',fontSize:'var(--jp-code-font-size)'});
     await showDialog({title:'Python contextual help',body,buttons:[Dialog.okButton({label:'Close'})]});
   });
+  button('Variables','Inspect the current Python namespace',async()=>{
+    app.shell.activateById(panel.id);
+    await app.commands.execute('jupyterlite-touch-tools:show-variables');
+  });
   const editCommand=command=>async cell=>{
     const editor=await focusCode(cell);
     if(editor?.execCommand)editor.execCommand(command);
   };
   button('Indent','Indent selected Python lines',editCommand(indentMore));
   button('Dedent','Dedent selected Python lines',editCommand(indentLess));
-  button('Undo','Undo the latest code edit',editCommand(undo));
-  button('Redo','Redo the latest code edit',editCommand(redo));
+  // JupyterLab's CodeMirror editor uses the shared Yjs model for history,
+  // not CodeMirror's independent history extension. Use its public methods.
+  button('Undo','Undo the latest code edit',async cell=>{
+    const editor=await focusCode(cell);
+    editor?.undo();
+  });
+  button('Redo','Redo the latest code edit',async cell=>{
+    const editor=await focusCode(cell);
+    editor?.redo();
+  });
   button('Edit Markdown','Edit the selected Markdown cell',async cell=>{
     cell=await readyCell(cell);
     if(!cell||cell.model.type!=='markdown')return;
@@ -136,6 +148,7 @@ function install(app,panel) {
       b.hidden=!code;
       b.disabled=!editable||(name==='Complete'&&!app.commands.hasCommand(COMPLETE));
     }
+    buttons.get('Variables').hidden=!app.commands.hasCommand('jupyterlite-touch-tools:show-variables');
     for(const name of ['Edit Markdown','Render Markdown']){
       const b=buttons.get(name);b.hidden=!markdown;b.disabled=!editable;
     }

@@ -13,6 +13,10 @@
 
 Seleziona una cella Python: la barra Editing offre Complete, Help, Indent, Dedent, Undo e Redo. Esegui prima gli import per ottenere suggerimenti del kernel. Seleziona una cella Markdown: usa Edit Markdown per modificarla e Render Markdown per visualizzare il testo formattato senza eseguire codice Python. Non serve Ctrl.
 
+## Osservare le variabili Python
+
+Dopo aver eseguito una cella, usa Variables nella barra Editing e Refresh variables nel pannello a destra. Puoi osservare nomi, tipi e valori abbreviati delle variabili del kernel corrente. Dopo una nuova esecuzione aggiorna esplicitamente il pannello. Il pannello non salva lo stato del kernel su Drive.
+
 ## Se qualcosa non funziona
 
 - Authorization expired: scegli Renew authorization con lo stesso account.
