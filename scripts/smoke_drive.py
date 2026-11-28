@@ -59,6 +59,7 @@ class FakeDrive:
         self.csv_data = "x,y\n2,3\n4,5\n"
         self.csv_version = 1
         self.workspace_list_reads = 0
+        self.extra_files = {}
 
     def metadata(self):
         return {"id":"demo-file", "name":"remote.ipynb", "version":str(self.version),
@@ -103,11 +104,18 @@ class FakeDrive:
             elif "'workspace' in parents" in query:
                 self.workspace_list_reads += 1
                 value = {"files":[self.metadata(), {"id":"data-file","name":"dati.csv","mimeType":"text/csv"},
-                                  {"id":"subfolder","name":"Exercises","mimeType":"application/vnd.google-apps.folder"}]}
+                                  {"id":"subfolder","name":"Exercises","mimeType":"application/vnd.google-apps.folder"},
+                                  *[e["meta"] for e in self.extra_files.values()]]}
             elif "'subfolder' in parents" in query:
                 value = {"files":[]}
             else:
                 value = {"files":[self.metadata(), {"id":"other","name":"ignore.csv"}]}
+        elif url.path.startswith("/drive/v3/files/") and url.path.split("/")[-1] in self.extra_files and req.method == "GET":
+            entry = self.extra_files[url.path.split("/")[-1]]
+            if parse_qs(url.query).get("alt") == ["media"]:
+                route.fulfill(status=200,headers=cors,body=entry["bytes"])
+                return
+            value = entry["meta"]
         elif url.path == "/drive/v3/files/demo-file" and req.method == "GET":
             value = self.notebook if parse_qs(url.query).get("alt") == ["media"] else self.metadata()
         elif url.path == "/upload/drive/v3/files" and req.method == "POST":
@@ -118,11 +126,17 @@ class FakeDrive:
             assert metadata.get("parents") == ["workspace"]
             data_bytes = parts[1].get_payload(decode=True)
             self.created_data.append((metadata["name"], data_bytes))
-            value = {"id":"new-data-" + str(len(self.created_data)), "name":metadata["name"], "version":"1"}
+            value = {"id":"new-data-" + str(len(self.created_data)), "name":metadata["name"], "version":"1",
+                     "mimeType":metadata["mimeType"], "size":str(len(data_bytes)), "capabilities":{"canEdit":True}}
+            self.extra_files[value["id"]] = {"meta":value,"bytes":data_bytes}
         elif url.path == "/upload/drive/v3/files/data-file" and req.method == "PATCH":
             self.csv_data = req.post_data_buffer.decode("utf-8")
             self.csv_version += 1
             value = {"id":"data-file","name":"dati.csv","version":str(self.csv_version)}
+        elif url.path.startswith("/upload/drive/v3/files/") and url.path.split("/")[-1] in self.extra_files and req.method == "PATCH":
+            entry = self.extra_files[url.path.split("/")[-1]]
+            entry["bytes"] = req.post_data_buffer
+            value = entry["meta"] = {**entry["meta"], "version":str(int(entry["meta"]["version"])+1), "size":str(len(entry["bytes"]))}
         elif url.path == "/upload/drive/v3/files/demo-file" and req.method == "PATCH":
             if self.hold_next_write:
                 self.hold_next_write = False
@@ -204,7 +218,7 @@ def browse_remote(page):
     expect(cell).to_be_visible(timeout=30000)
     return cell
 
-def start(browser, url, drive, service_workers="block"):
+def start(browser, url, drive, service_workers="block", sidebar_connect=False):
     context = browser.new_context(service_workers=service_workers)
     context.add_init_script(MOCK_GOOGLE)
     context.route("https://www.googleapis.com/**", drive.handle)
@@ -215,7 +229,14 @@ def start(browser, url, drive, service_workers="block"):
     page.on("console", lambda msg: print("Filesystem:", msg.text) if "synced with Jupyter Contents" in msg.text else None)
     page.goto(url, wait_until="domcontentloaded", timeout=120000)
     expect(page.locator(".jp-Notebook:visible").first).to_be_visible(timeout=120000)
-    command(page, "Connect")
+    if sidebar_connect:
+        workspace=page.locator("#jupyterlite-google-drive-sidebar")
+        if not workspace.is_visible():
+            page.get_by_role("tab",name="Drive",exact=True).click()
+        expect(workspace.get_by_role("button",name="Connect",exact=True)).to_be_enabled(timeout=30000)
+        workspace.get_by_role("button",name="Connect",exact=True).click()
+    else:
+        command(page, "Connect")
     dialog(page, "Connected.")
     return context, page
 

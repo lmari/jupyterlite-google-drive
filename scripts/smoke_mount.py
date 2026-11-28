@@ -45,7 +45,7 @@ def main():
                     browser=pw.chromium.launch()
                     page=None
                     try:
-                        ctx,page=start(browser,url,fake,service_workers="allow" if service_worker else "block")
+                        ctx,page=start(browser,url,fake,service_workers="allow" if service_worker else "block",sidebar_connect=True)
                         assert page.evaluate("crossOriginIsolated") == (not service_worker), "Unexpected cross-origin isolation status"
                         if service_worker:
                             # Registration alone is insufficient: the page must be controlled.
@@ -246,6 +246,36 @@ def main():
                         expect(workspace.locator("[data-dependency-state]")).to_have_attribute("data-dependency-state","mounted")
                         expect(workspace.get_by_text("/drive/data/other.csv",exact=True)).to_have_count(0)
                         print("Fresh browser restored only the selected notebook data dependency and executed Python.")
+                        # Exercise the actual filesystem, not a Python open() replacement.
+                        edit_cell(page,cell,'with open("/drive/dati2.txt", "x") as f:\n    f.write("1 2 3 4 5")\nprint(open("/drive/dati2.txt").read())')
+                        page.keyboard.press("Control+Enter")
+                        expect(output).to_have_text("1 2 3 4 5",timeout=60000)
+                        created=next(e for e in fake.extra_files.values() if e["meta"]["name"]=="dati2.txt")
+                        assert created["bytes"]==b"1 2 3 4 5"
+                        command(page,"Open folder")
+                        expect(workspace.get_by_role("button",name="Open dati2.txt",exact=True)).to_be_visible()
+                        edit_cell(page,cell,'with open("/drive/dati2.txt", "a") as f:\n    f.write(" 6")\nprint(open("/drive/dati2.txt").read())')
+                        page.keyboard.press("Control+Enter")
+                        expect(output).to_have_text("1 2 3 4 5 6",timeout=60000)
+                        assert created["bytes"]==b"1 2 3 4 5 6"
+                        edit_cell(page,cell,'with open("/drive/dati2.txt", "w") as f:\n    f.write("updated")\nprint(open("/drive/dati2.txt").read())')
+                        page.keyboard.press("Control+Enter")
+                        expect(output).to_have_text("updated",timeout=60000)
+                        assert created["bytes"]==b"updated"
+                        edit_cell(page,cell,'try:\n    open("/drive/dati2.txt", "x").close()\nexcept FileExistsError:\n    print("exclusive")')
+                        page.keyboard.press("Control+Enter")
+                        expect(output).to_have_text("exclusive",timeout=60000)
+                        assert created["bytes"]==b"updated"
+                        edit_cell(page,cell,'f = open("/drive/dati2.txt", "a")\nf.write(" stale")\nprint("opened")')
+                        page.keyboard.press("Control+Enter")
+                        expect(output).to_have_text("opened",timeout=60000)
+                        created["bytes"]=b"external"
+                        created["meta"]["version"]=str(int(created["meta"]["version"])+1)
+                        edit_cell(page,cell,'try:\n    f.close()\nexcept OSError:\n    print("conflict")')
+                        page.keyboard.press("Control+Enter")
+                        expect(output).to_have_text("conflict",timeout=60000)
+                        assert created["bytes"]==b"external"
+                        print("Remote create, append, overwrite, exclusive collision and stale write protection verified.")
                         ctx.close()
                     except Exception:
                         if page and not page.is_closed():

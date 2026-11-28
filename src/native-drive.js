@@ -1,4 +1,5 @@
 import {Signal} from '@lumino/signaling';
+import {RemoteWrites,writeNamespace} from './remote-writes.js';
 import {notebookName, validateNotebook, validateDataMetadata, maxDataBytes} from './drive-api.js';
 
 import {dataPath, toBase64} from './kernel-data.js';
@@ -15,19 +16,28 @@ export class NativeDrive {
   name = 'GoogleDrive';
   isDisposed = false;
   fileChanged = new Signal(this);
+  folderChanged = new Signal(this);
   #entries = new Map();
   #data = new Map();
   #folderFiles = new Map();
   #outputs = new Map();
   #generation = 0;
-  constructor(api) { this.api = api; }
+  #remoteWrites;
+  constructor(api) {
+    this.api=api;
+    this.#remoteWrites=new RemoteWrites(api,(parent,meta,existing)=>{
+      this.#folderFiles.set(meta.name,{id:meta.id,meta});
+      this.folderChanged.emit({parent,meta});
+      this.fileChanged.emit({type:existing?'save':'new',oldValue:null,newValue:this.#dataModel(meta.name,meta)});
+    });
+  }
 
   saveInfo(path) {
     const e=this.#entries.get(path);
     if (!e || this.isDisposed) return null;
     return {name:e.name,loaded:!!e.version,writable:e.canEdit!==false,busy:e.busy,lastSaved:e.lastSaved||null};
   }
-  get hasPendingSave() { return [...this.#entries.values()].some(entry => entry.busy); }
+  get hasPendingSave() { return this.#remoteWrites.pending || [...this.#entries.values()].some(entry => entry.busy); }
   release(path) {
     const entry = this.#entries.get(path);
     if (!entry) return;
@@ -40,6 +50,7 @@ export class NativeDrive {
     this.#entries.clear();
     this.#data.clear();
     this.#folderFiles.clear();
+    this.#remoteWrites.reset();
     this.#outputs.clear();
   }
   dispose() {
@@ -49,6 +60,7 @@ export class NativeDrive {
     this.#entries.clear();
     this.#data.clear();
     this.#folderFiles.clear();
+    this.#remoteWrites.reset();
     this.#outputs.clear();
     Signal.clearData(this);
   }
@@ -76,13 +88,14 @@ export class NativeDrive {
     this.#data.set(path, {id:meta.id,meta});
     return path;
   }
-  setFolderFiles(files) {
+  setFolderFiles(files,parent=null) {
+    this.#remoteWrites.setFolder(parent);
     const next=new Map(), ambiguous=new Set();
     for(const f of files) {
       // Only safe single-component names; reserve the explicit mount namespaces.
       if(!f.id || !f.mimeType || f.mimeType.startsWith('application/vnd.google-apps.') ||
         /\.ipynb$/i.test(f.name) || !f.name || /[\\/:\x00-\x1f]/.test(f.name) ||
-        ['.','..','data','output'].includes(f.name)) continue;
+        ['.','..','data','output',writeNamespace].includes(f.name)) continue;
       if(next.has(f.name)) ambiguous.add(f.name);
       next.set(f.name,{id:f.id,meta:f});
     }
@@ -200,6 +213,7 @@ export class NativeDrive {
       size:null};
   }
   async get(path, options = {}) {
+    if(path===writeNamespace||path.startsWith(writeNamespace+'/')) return this.#remoteWrites.get(path,options);
     if (!path || path === '/') {
       return this.#directory('',options.content === false ? null : [
         this.#directory('data',null),
@@ -242,6 +256,7 @@ export class NativeDrive {
     return entry.savedSnapshot === undefined || entry.savedSnapshot !== JSON.stringify(content);
   }
   async save(path, options = {}) {
+    if(path.startsWith(writeNamespace+'/')) return this.#remoteWrites.save(path,options);
     if (path.startsWith('output/')) return this.#saveOutput(path,options);
     if (path === 'data' || path.startsWith('data/') || this.#folderFiles.has(path)) throw unavailable();
     if (options.type && options.type !== 'notebook') throw unavailable();

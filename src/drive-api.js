@@ -31,6 +31,14 @@ export const isTextDatafile = name => /\.(csv|tsv|txt|json|jsonl|xml|yaml|yml|md
 export function decodeTextData(bytes) {
   return new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(bytes);
 }
+export const validDataName=name=>typeof name==='string'&&name.length>0&&name.length<=180&&
+  name!=='.'&&name!=='..'&&!/[\\/:\x00-\x1f\x7f]/.test(name)&&!/\x2eipynb$/i.test(name);
+export function dataMimeType(name) {
+  return name.toLowerCase().endsWith('.csv')?'text/csv':
+    name.toLowerCase().endsWith('.json')?'application/json':
+    name.toLowerCase().endsWith('.txt')?'text/plain':
+    name.toLowerCase().endsWith('.png')?'image/png':'application/octet-stream';
+}
 export class DriveAPI {
   constructor(token, fetcher = globalThis.fetch.bind(globalThis), onUnauthorized = () => {}) {
     this.token = token; this.fetcher = fetcher; this.onUnauthorized=onUnauthorized;
@@ -164,25 +172,22 @@ export class DriveAPI {
     const current=validateDataMetadata(await this.metadata(id));
     if(current.capabilities?.canEdit===false || !version || current.version!==version)
       throw new Error('Remote file changed or is not writable. Keep the local copy and reopen from Drive.');
-    return (await this.request(`${upload}/${encodeURIComponent(id)}?uploadType=media&fields=id,name,version,modifiedTime,size`,{
+    return (await this.request(`${upload}/${encodeURIComponent(id)}?uploadType=media&fields=id,name,version,modifiedTime,size,mimeType,capabilities(canEdit)`,{
       method:'PATCH',headers:{'Content-Type':current.mimeType},body:bytes
     })).json();
   }
   async createData(name, bytes, parent) {
-    if (typeof name !== 'string' || !/^[A-Za-z0-9_][A-Za-z0-9._-]{0,179}$/.test(name) ||
-        /\.ipynb$/i.test(name) || !(bytes instanceof Uint8Array) || bytes.byteLength > maxDataBytes) {
+    if (!validDataName(name) || !(bytes instanceof Uint8Array) || bytes.byteLength > maxDataBytes) {
       throw new Error('Invalid output filename or data exceeds 5 MiB.');
     }
-    const mimeType = name.toLowerCase().endsWith('.csv') ? 'text/csv' :
-      name.toLowerCase().endsWith('.json') ? 'application/json' :
-      name.toLowerCase().endsWith('.png') ? 'image/png' : 'application/octet-stream';
+    const mimeType = dataMimeType(name);
     const boundary = 'data_' + globalThis.crypto.randomUUID();
     // Blob preserves every byte; never stringify or UTF-8 decode binary data.
     const head = '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' +
       JSON.stringify({name,mimeType,...(parent?{parents:[parent]}:{})}) + '\r\n--' + boundary + '\r\nContent-Type: ' + mimeType + '\r\n\r\n';
     const body = new Blob([head,bytes,'\r\n--' + boundary + '--\r\n']);
     // POST always creates a new file, even if another file has the same name.
-    return (await this.request(`${upload}?uploadType=multipart&fields=id,name,version,modifiedTime,size`, {
+    return (await this.request(`${upload}?uploadType=multipart&fields=id,name,version,modifiedTime,size,mimeType,capabilities(canEdit)`, {
       method:'POST',headers:{'Content-Type':`multipart/related; boundary=${boundary}`},body
     })).json();
   }

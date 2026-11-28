@@ -68,6 +68,7 @@ export class DriveSidebar extends Widget {
     };
     const connected=s.auth==='connected';
     if(this.mode==='files') {
+      if(!connected) body.append(button(s.hasAccount?'Renew authorization':'Connect',s.hasAccount?'renew':'connect',s.prepared));
       const path=element('h3',s.folderPath||'JupyterLite');
       path.style.margin='4px 0';
       body.append(path);

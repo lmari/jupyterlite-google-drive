@@ -55,6 +55,7 @@ def main():
                         workspace=page.locator("#jupyterlite-google-drive-sidebar")
                         expect(workspace.locator("h3").filter(has_text=re.compile(r"^Current notebook$"))).to_have_count(0)
                         expect(workspace.locator("button").filter(has_text=re.compile(r"^Refresh folder$"))).to_be_disabled()
+                        expect(workspace.locator("button").filter(has_text=re.compile(r"^Connect$"))).to_be_disabled()
                         page.locator(".lm-MenuBar-item").filter(has_text="File").first.click()
                         page.locator(".lm-Menu:visible").first.get_by_text("Google Drive (advanced)",exact=True).hover()
                         submenu=page.locator("#jupyterlite-google-drive-advanced-menu")

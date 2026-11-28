@@ -1,5 +1,7 @@
 // Adapt the already initialized Pyodide DriveFS, retaining its actual transport
 // (service worker or shared memory). No Python open monkeypatch, data copy or token.
+import {installRemoteWriteStreams} from './remote-writes.js';
+const writeBootstrap=JSON.stringify('('+installRemoteWriteStreams.toString()+')');
 export const bootstrap = `def _jupyterlite_install_dual_mount():
     from pyodide_js import FS
     from pyodide.ffi import to_js
@@ -24,6 +26,8 @@ export const bootstrap = `def _jupyterlite_install_dual_mount():
     FS.mount(local, Object.new(), '/local')
     old.API._driveName = 'GoogleDrive'
     old.driveName = 'GoogleDrive'
+    from pyodide.code import run_js
+    run_js(${writeBootstrap})(old)
     if not original and (cwd == '/drive' or cwd.startswith('/drive/')):
         FS.chdir('/local' + cwd[len('/drive'):])
 try:

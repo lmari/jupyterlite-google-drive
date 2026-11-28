@@ -35,7 +35,7 @@ const plugin = {
     const loadFolder = async () => {
       const folder=await ensureFolder();
       authorizedFiles=await drive.listFolder(folder.id);
-      native.setFolderFiles(authorizedFiles);
+      native.setFolderFiles(authorizedFiles,folder.id);
       listLoaded=true;
     };
     const tell = (title, body) => showDialog({title, body, buttons: [Dialog.okButton()]});
@@ -463,14 +463,18 @@ const plugin = {
       await loadFolder();
     });
     const openFolder=add('open-folder','Google Drive: Open folder',async(args={})=>{
+      const changing=!!(args.up&&folders.length>1||args.folderId);
+      if(changing&&native.hasPendingSave) throw new Error('Wait for the current Google Drive save to finish.');
       if(args.up && folders.length>1) folders.pop();
       else if(args.folderId) {
         const child=authorizedFiles.find(f=>f.id===args.folderId && f.mimeType===folderMime);
         if(!child) throw new Error('Refresh the folder first.');
         folders.push(child);
       }
-      authorizedFiles=[];listLoaded=false;
-      native.setFolderFiles([]);
+      if(changing) {
+        authorizedFiles=[];listLoaded=false;
+        native.setFolderFiles([]);
+      }
       sidebar.setViewMode('files');
       app.shell.activateById(sidebar.id);
       await loadFolder();
@@ -508,6 +512,11 @@ const plugin = {
     tracker.currentChanged.connect(refreshSidebar);
     app.shell.currentChanged?.connect(refreshSidebar);
     native.fileChanged.connect(refreshSidebar);
+    native.folderChanged.connect((_sender,{parent,meta})=>{
+      if(folders.at(-1)?.id!==parent||auth.status!=='connected') return;
+      authorizedFiles=[...authorizedFiles.filter(f=>f.id!==meta.id),meta];
+      refreshSidebar();
+    });
 
     // Two compact File entries. Keep the ordinary native workflow separate
     // from account switching, legacy local-copy and recovery operations.
