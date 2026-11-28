@@ -175,7 +175,12 @@ def edit_cell(page, cell, text):
     cell.click()
     page.keyboard.press("Control+a")
     page.keyboard.insert_text(text)
-    expect(cell).to_have_text(text)
+    # CodeMirror renders each source line in a separate block. textContent
+    # concatenates those blocks without newlines, so compare lines directly.
+    if "\n" in text:
+        expect(cell.locator(".cm-line")).to_have_text(text.split("\n"))
+    else:
+        expect(cell).to_have_text(text)
 
 def command(page, label):
     advanced = ["Renew authorization","Open native notebook (experimental)","Open notebook","Browse authorized notebooks","Save to original","Save a new copy","Refresh workspace list","New folder","Mount read-only data file (experimental)","Import data into Python","Export Python output as new file","Add selected data dependency","Remove recorded data dependency","Remember mounted data in notebook","Restore notebook data dependencies","Notebook and data status","Save local recovery copy","Download notebook recovery file","Download Python output locally"]
