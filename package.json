@@ -1,6 +1,6 @@
 {
   "name": "jupyterlite-google-drive",
-  "version": "0.6.0-beta.16",
+  "version": "0.6.0-beta.17",
   "description": "Browser-only JupyterLite notebook persistence and Python data import from Google Drive",
   "license": "BSD-3-Clause",
   "type": "module",
@@ -8,7 +8,7 @@
   "scripts": {
     "test": "node --test tests/*.test.js",
     "build": "jupyter-builder build .",
-    "check": "node --check src/index.js && node --check src/auth.js && node --check src/drive-api.js && node --check src/native-drive.js && node --check src/kernel-data.js && node --check src/sidebar.js && node --check src/save-status.js && node --check src/dependencies.js && node --check src/recovery.js && node --check src/editing-tools.js && node --check src/variable-snapshot.js && node --check src/variable-inspector.js && node --check src/dual-mount.js && node --check src/remote-writes.js"
+    "check": "node --check src/index.js && node --check src/auth.js && node --check src/drive-api.js && node --check src/native-drive.js && node --check src/kernel-data.js && node --check src/sidebar.js && node --check src/save-status.js && node --check src/dependencies.js && node --check src/recovery.js && node --check src/editing-tools.js && node --check src/variable-snapshot.js && node --check src/variable-inspector.js && node --check src/dual-mount.js && node --check src/remote-writes.js && node --check src/document-origin.js"
   },
   "dependencies": {
     "@jupyterlab/apputils": "4.8.0-beta.2",

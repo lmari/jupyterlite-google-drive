@@ -6,6 +6,7 @@ import {INotebookTracker} from '@jupyterlab/notebook';
 import {Menu} from '@lumino/widgets';
 import {IKernelSpecs} from '@jupyterlite/services';
 import {installDualMount} from './dual-mount.js';
+import {documentOrigin,decorateDocument,installOriginStyles} from './document-origin.js';
 import editingTools from './editing-tools.js';
 import variableInspector from './variable-inspector.js';
 import {GoogleAuth} from './auth.js';
@@ -26,7 +27,16 @@ const plugin = {
     const drive = new DriveAPI(() => auth.token(),undefined,token=>auth.invalidate(token));
     let links = new WeakMap(); let dataLinks=new WeakMap(); let busy = false; let prepared = false; let preparationError = '';
     let sidebar; let authorizedFiles = []; let listLoaded = false; let folders=[]; const commandIds=[];
-    const refreshSidebar = () => { sidebar?.refresh(); for(const id of commandIds) app.commands.notifyCommandChanged(id); };
+    const updateOrigins=()=>{
+      for(const widget of app.shell.widgets('main')) {
+        const context=docs.contextForWidget(widget);
+        if(!context||context.isDisposed) continue;
+        const path=context.path;
+        if(!/\.ipynb$/i.test(path)&&!isTextDatafile(path)) continue;
+        decorateDocument(widget.title,documentOrigin(path,links.has(widget)||dataLinks.has(context),auth.status));
+      }
+    };
+    const refreshSidebar = () => { updateOrigins(); sidebar?.refresh(); for(const id of commandIds) app.commands.notifyCommandChanged(id); };
     const clearList = () => { authorizedFiles=[]; listLoaded=false; folders=[]; };
     const ensureFolder = async () => {
       if(!folders.length) folders=[await drive.workspaceRoot()];
@@ -508,7 +518,13 @@ const plugin = {
           mimeType:f.mimeType, modified:f.modifiedTime?new Date(f.modifiedTime).toLocaleString():''})):[],
         folderPath:folders.map(f=>f.name).join(' / '),canGoUp:folders.length>1,loaded:listLoaded,data:native.listData(),outputs:native.listOutputs()};
     });
+    installOriginStyles();
     app.shell.add(sidebar,'left',{rank:700});
+    // DocumentManager can refresh captions asynchronously after activation/save.
+    // Reconcile decorations for all tabs, including inactive documents.
+    const originTimer=globalThis.setInterval(updateOrigins,1000);
+    sidebar.disposed.connect(()=>globalThis.clearInterval(originTimer));
+    updateOrigins();
     tracker.currentChanged.connect(refreshSidebar);
     app.shell.currentChanged?.connect(refreshSidebar);
     native.fileChanged.connect(refreshSidebar);

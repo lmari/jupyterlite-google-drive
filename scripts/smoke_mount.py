@@ -69,7 +69,7 @@ def main():
                         editor=page.locator(".jp-FileEditor:visible .cm-content").first
                         expect(editor).to_be_visible(timeout=30000)
                         expect(editor).to_contain_text("x,y")
-                        expect(page.get_by_role("tab",name="dati.csv",exact=True)).to_be_visible()
+                        expect(page.get_by_role("tab",name="dati.csv",exact=True)).to_have_attribute("data-drive-origin","linked",timeout=30000)
                         # The local file browser must show the file in its root.
                         page.get_by_role("tab",name="File Browser (Ctrl+Shift+F)").click()
                         expect(page.locator(".jp-DirListing-item").filter(has_text="dati.csv")).to_be_visible(timeout=30000)
@@ -81,7 +81,8 @@ def main():
                         assert fake.csv_version == 2
                         assert fake.csv_data == "x,y\n2,3\n4,5\n"
                         workspace.get_by_role("button",name="Open remote.ipynb",exact=True).click()
-                        expect(page.get_by_role("tab",name="remote.ipynb",exact=True)).to_be_visible(timeout=30000)
+                        expect(page.get_by_role("tab",name="remote.ipynb",exact=True)).to_have_attribute("data-drive-origin","linked",timeout=30000)
+                        expect(page.get_by_role("tab",name="welcome.ipynb",exact=True)).to_have_attribute("data-drive-origin","local",timeout=30000)
                         local_cell=page.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
                         expect(local_cell).to_have_text("40 + 2",timeout=30000)
                         edit_cell(page,local_cell,'import csv; tuple(sum(int(r["x"]) for r in csv.DictReader(open(p))) for p in ("/local/dati.csv","/drive/dati.csv"))')
@@ -102,6 +103,7 @@ def main():
                         command(page,"Open native notebook (experimental)")
                         dialog(page,"Experimental remote editor")
                         dialog(page,"Opened native notebook")
+                        expect(page.locator(".lm-TabBar-tab[data-drive-origin=remote]")).to_be_visible(timeout=30000)
                         expect(page.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first).to_have_text("40 + 2",timeout=30000)
                         command(page,"Notebook and data status")
                         expect(workspace.get_by_role("heading",name="Current notebook")).to_be_visible()
