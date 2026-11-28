@@ -1,9 +1,32 @@
-# Touch runtime experiment
+# Touch runtime experiment: results
 
-Do not deploy or merge until the comparison is reviewed and a real tablet is tested.
+The experiment addressed the loss of touch menu actions and immediate submenu dismissal on tablets, reported during use of the earlier runtime. Lumino [PR 834](https://github.com/jupyterlab/lumino/pull/834) addresses these events.
 
-The existing 0.6.0-beta.2 site uses JupyterLite 0.8.7, JupyterLab 4.6.6 and Lumino Widgets 2.8.0. Lumino [PR 834](https://github.com/jupyterlab/lumino/pull/834) addresses touch menu activation and follow-up click dismissal. The candidate uses JupyterLite 0.9.0b2, JupyterLab 4.7.0b2, Pyodide kernel 0.9.0b0 and Lumino Widgets 2.10.0, matching the upstream [lockfile](https://github.com/jupyterlite/jupyterlite/blob/v0.9.0b2/yarn.lock). Python 3.11+ is required for these dependencies.
+## Historical comparison
 
-The comparison workflow runs the same touch script in independent builds of the known deployed baseline (commit 3ba8723bf5ce5e81a468cb48d204f8e9bdcc9e9f) and the candidate. It tests Chromium and Firefox with touch enabled, waits for the follow-up click, opens both Google Drive submenus, executes actual commands including a local notebook download, and tests a native JupyterLab New > Text File submenu. It records per-browser outcomes and diagnostic screenshots. A baseline failure is recorded but not treated as a candidate failure. A passing baseline means the reported defect has not been reproduced under this simulation; a passing candidate alone then does not demonstrate a fix.
+| Runtime | Baseline (0.6.0-beta.2) | Updated (0.6.0-beta.3) |
+|---|---|---|
+| JupyterLite | 0.8.7 | 0.9.0b2 |
+| JupyterLab | 4.6.6 | 4.7.0b2 |
+| Pyodide kernel | 0.8.7 | 0.9.0b0 |
+| Lumino Widgets | 2.8.0 | 2.10.0 |
+| Chromium touch | Failed at ordinary Drive submenu | Passed |
+| Firefox touch | Failed at ordinary Drive submenu | Passed |
 
-The normal CI workflow separately checks the candidate's existing notebook, DriveFS, dependency, recovery and installable wheel regression suite. No Google credentials are configured. Neither workflow deploys a pull request. Automated desktop engines are not a physical Android browser. A subsequent real-device acceptance check is required, especially on Android Firefox and Chrome, before switching the production site.
+The same test script was run in independent builds with touch-enabled desktop browser engines, without mouse hover. It reproduced the reported submenu failure on the baseline and passed on the updated runtime, including ordinary and advanced Drive menu activation, recovery download and native JupyterLab New > Text File. See [comparison run 45910895067](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45910895067).
+
+The updated runtime also passed the full regression suite, including both filesystem transports and installation of the wheel into an independent site with real Python execution. It was merged through [PR #15](https://github.com/lmari/jupyterlite-google-drive/pull/15) and [deployed to GitHub Pages](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45911431859).
+
+## Reproduce the test
+
+Build the site using the current repository dependencies, install Playwright's Chromium and Firefox engines, then run:
+
+```sh
+python scripts/smoke_touch.py
+```
+
+The [comparison workflow](../.github/workflows/touch-comparison.yml) records outcomes and diagnostic screenshots for the historical baseline (commit 3ba8723bf5ce5e81a468cb48d204f8e9bdcc9e9f) and the pull request candidate. A failing historical baseline is expected; a failing candidate must be investigated.
+
+## Remaining acceptance
+
+These automated tests emulate touch in desktop engines, not physical Android or iPad browsers. The updated runtime has been deployed for experimental testing, not certified for tablet classroom use. Verify on physical devices, including Firefox and Chrome on Android if applicable: open File, select both Drive submenus, tap ordinary and advanced commands, and exercise a native JupyterLab submenu. Record browser/OS versions and results in the [acceptance checklist](acceptance.md).

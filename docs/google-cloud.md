@@ -1,76 +1,41 @@
-# Google Cloud configuration for the alpha demo
+# Google Cloud configuration: troubleshooting and deployment notes
 
-The static demo can be used without Google. To enable Drive, the owner of the
-deployment needs to create a Google Cloud project. Start in testing mode using
-a disposable notebook. No service account, billing-dependent compute,
-backend, client secret, or permanent refresh token is required.
+The complete setup procedure is in [README > Google Cloud setup](../README.md#google-cloud-setup), including API activation, OAuth branding and audience, test users, the restricted browser key, numeric project number, local configuration and GitHub Pages deployment. Follow it before using the checks below. Only the site operator needs a Cloud project.
 
-## Google Cloud Console
+## Common problems
 
-1. Open https://console.cloud.google.com/ and create or select a dedicated
-   project (e.g. `JupyterLite Google Drive`).
-2. In APIs & Services > Library, enable **Google Drive API** and
-   **Google Picker API**.
-3. In Google Auth Platform, configure Branding (app name, support email,
-   developer contact), Audience (External if appropriate; Testing; add
-   your Google account to Test users), and Data Access. Request only
-   `https://www.googleapis.com/auth/drive.file` for Drive.
-4. In Clients, create an OAuth client of type **Web application**.
-   Authorized JavaScript origins: `https://lmari.github.io` (no path or
-   trailing slash). For local development add `http://localhost` and
-   `http://localhost:8000`. No redirect URI is needed for the token model.
-   Copy the client ID (ends in `.apps.googleusercontent.com`); do not use
-   a client secret.
-5. In APIs & Services > Credentials, create an API key. Under application
-   restrictions select Websites and allow
-   `https://lmari.github.io/*` and `https://docs.google.com/*`.
-   Picker runs in an iframe from docs.google.com, which must be allowed.
-   Add a localhost referrer only if needed for development. Under API
-   restrictions select Google Picker API and Google Drive API.
-6. Find the numeric **Project number** in the project dashboard or
-   IAM & Admin > Settings. This is the Picker App ID, not the project ID.
-
-All three public values must come from the same project.
-
-## GitHub
-
-Open https://github.com/lmari/jupyterlite-google-drive/settings/variables/actions
-and create the following **repository variables** (not secrets):
-
-| Name | Value |
+| Symptom | What to check |
 |---|---|
-| GOOGLE_DRIVE_CLIENT_ID | OAuth web client ID |
-| GOOGLE_DRIVE_API_KEY | restricted browser API key |
-| GOOGLE_DRIVE_APP_ID | numeric Google Cloud project number |
+| Drive sidebar: Configuration unavailable | Verify that all three runtime values are present in the generated jupyter-lite.json. For Pages, check the Actions repository variables and rebuild. For local builds, check demo/jupyter-lite.json or the environment variables. |
+| Google OAuth says access is blocked or the app is in testing | In the selected Cloud project, open Google Auth Platform > Audience. Add the exact Google account under Test users, and select that account when connecting. Check Workspace organization policies if applicable. |
+| origin_mismatch | In Google Auth Platform > Clients, add the exact scheme, hostname and port as an Authorized JavaScript origin. Never add a path, wildcard or trailing slash. |
+| API developer key is invalid in Picker | Confirm both APIs are enabled, that the key belongs to the same project, and that website restrictions include the hosting origin and https://docs.google.com/*. Check API restrictions for Drive and Picker. |
+| Picker opens but the notebook list is empty | The drive.file scope is intentionally per-file. Select an existing notebook through Picker, or save a new Drive copy, then refresh the list. |
+| Authorization expired / HTTP 401 | Choose Renew authorization in the Drive sidebar, selecting the original account. Retry the failed operation explicitly. |
+| Google services do not load or no consent window appears | Open the site directly, check network access and browser popup settings. Test in another browser profile if necessary. Do not disable browser security globally. |
+| Changes to Pages configuration are not visible | Run a new build and verify deployment succeeded. After saving or downloading current work, reload the site; a service worker or cache can still serve an earlier build. |
+| Python cannot open /drive/data | Check that the notebook is open in native remote mode and the file is mounted. The filesystem bridge requires a supported browser and secure context (HTTPS or localhost). Try the temporary import fallback; it uses a different path. |
 
-These are intentionally visible to browsers in the deployed configuration.
-Do not place client secrets, access tokens or account passwords here.
+Check the public configuration in the site's jupyter-lite.json by looking at its three property names and confirming values are set. Do not copy access tokens, account passwords, client secrets, private file IDs or notebook contents into screenshots, logs or issue reports.
 
-Go to https://github.com/lmari/jupyterlite-google-drive/actions, select
-Build and test > Run workflow, choose main and enable deploy. Wait for
-both build and deploy to succeed. Alternatively set PAGES_ENABLED=true
-to enable subsequent deployments on pushes to main.
+## Origins and key restrictions
 
-## First real test
+For the original project, the Pages URL is https://lmari.github.io/jupyterlite-google-drive/lab/index.html, but its OAuth origin is only https://lmari.github.io. The corresponding browser API key referrer is https://lmari.github.io/*. For a fork, substitute the actual host. The extra Picker referrer https://docs.google.com/* is necessary because Picker is hosted in an iframe on that domain.
 
-Open https://lmari.github.io/jupyterlite-google-drive/lab/index.html directly,
-not in an iframe. Reload if an older service worker caches the site.
-Use File > Google Drive: Connect, then Open notebook; choose a disposable
-.ipynb from Drive. Edit and run a cell, Save to original, then repeat the
-open step from another browser on the same account. Verify that the edit
-appears. Try the conflict and isolation tests in README.
+Localhost is useful for desktop development. Accessing a local HTTP server on another device via a LAN IP is not equivalent to a secure localhost origin; it can be used for unconfigured UI tests, not full Google/DriveFS acceptance. Prefer HTTPS Pages for real tablet tests.
 
-If Google shows origin_mismatch, check the exact OAuth origin; if Picker
-reports an invalid developer key, check the referrer and API restrictions.
-If no Google configuration is detected, check the repository variables and
-the deployed jupyter-lite.json. A test account or institutional Workspace
-administrator may impose additional restrictions.
+## Broader deployment
 
-Public release requires a review of Google's OAuth policies, a privacy notice
-and an origin dedicated to trusted application code. A project path on
-GitHub Pages does not isolate it from other sites under lmari.github.io.
+For a personal test, an External audience in Testing mode with explicitly allowed accounts is appropriate. For an institutional deployment, assess the Internal audience if the organization supports it, or the External app requirements. Check Google's current publishing, verification and user-limit rules, including the requirements for app branding and privacy documentation. Do not request broader scopes to avoid a consent error. A dedicated trusted HTTPS origin is preferable because scripts under the same origin share a security boundary; project paths on GitHub Pages do not isolate applications.
 
-Official references:
-- https://developers.google.com/workspace/drive/picker/guides/web-picker-sample
-- https://developers.google.com/identity/oauth2/web/guides/use-token-model
-- https://developers.google.com/identity/protocols/oauth2/policies
+The deployment operator supplies the public OAuth client ID, restricted browser API key and numeric project number. End users grant their own per-file permissions, using their own accounts. The project does not use a client secret or a service account.
+
+Continue with the [real-account acceptance checklist](acceptance.md) before pilot classroom use.
+
+Official documentation:
+
+- [OAuth consent and scopes](https://developers.google.com/workspace/guides/configure-oauth-consent)
+- [Google Picker integration and referrer restrictions](https://developers.google.com/workspace/drive/picker/guides/web-picker)
+- [Browser token model](https://developers.google.com/identity/oauth2/web/guides/use-token-model)
+- [API key restrictions](https://docs.cloud.google.com/docs/authentication/api-keys)
+- [Google OAuth policies](https://developers.google.com/identity/protocols/oauth2/policies)

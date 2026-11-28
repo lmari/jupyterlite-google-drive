@@ -5,7 +5,7 @@ Use only disposable notebooks and non-sensitive data. CI uses actual JupyterLite
 ## Preparation
 
 - Open https://lmari.github.io/jupyterlite-google-drive/lab/index.html in a current desktop Chromium or Firefox browser; confirm the latest deployment succeeded in Actions. Use two independent browser profiles or two computers. Do not clear browser storage containing needed local notebooks.
-- Configure Google Cloud following [google-cloud.md](google-cloud.md). Add the testing account to the OAuth test-user list. Do not share credentials or tokens in bug reports.
+- Configure Google Cloud following [Google Cloud setup](../README.md#google-cloud-setup). Add the testing account to the OAuth test-user list. Do not share credentials or tokens in bug reports.
 - Upload a disposable CSV named dati.csv with three lines: x,y then 2,3 then 4,5. Use the same account on both devices.
 
 ## Notebook and input workflow
@@ -41,7 +41,7 @@ Use only disposable notebooks and non-sensitive data. CI uses actual JupyterLite
 
 ## Record results
 
-Record browser/version, OS, deployment commit, date, step number, actual result, and sanitized error. Mark pass/fail/not tested separately for each step. Never paste access tokens, private file IDs or sensitive notebook data. Test mobile separately if intended for classroom use.
+Record browser/version, OS, deployment commit, date, step number, actual result, and sanitized error. Mark pass/fail/not tested separately for each step. Never paste access tokens, private file IDs or sensitive notebook data. Test mobile separately if intended for classroom use. On a physical tablet, use touch only to open File, open and activate both Drive submenus, open the native New submenu, and execute a command. Verify notebook editing and saving with the toolbar as well as local recovery. Record results for each browser; desktop touch emulation is not a substitute.
 
 ## Release gate
 

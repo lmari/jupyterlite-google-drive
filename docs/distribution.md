@@ -1,6 +1,6 @@
 # Install the prebuilt extension
 
-Experimental beta candidate, not approved for production or classroom deployment. The package is a JupyterLab federated frontend extension for JupyterLite 0.9.0b2 / JupyterLab 4.7.0b2 / Pyodide kernel 0.9.0b0 (experimental combination; verification pending). It has no server extension. Compatibility outside this tested combination is not established.
+Experimental beta candidate, not approved for production or classroom deployment. The package is a JupyterLab federated frontend extension for JupyterLite 0.9.0b2 / JupyterLab 4.7.0b2 / Pyodide kernel 0.9.0b0 (automated tests passed; real-account acceptance pending). It has no server extension. Compatibility outside this tested combination is not established.
 
 ## Install and build
 
@@ -27,7 +27,7 @@ Create a site directory with `jupyter-lite.json` using the settings below (all v
 }
 ```
 
-Follow [Google Cloud setup](google-cloud.md) for your own OAuth client and origin. Run from that directory:
+Follow [Google Cloud setup](../README.md#google-cloud-setup) for your own OAuth client and origin. Run from that directory:
 
 ```sh
 jupyter lite build --output-dir dist
