@@ -104,8 +104,7 @@ function install(app,panel) {
     await showDialog({title:'Python contextual help',body,buttons:[Dialog.okButton({label:'Close'})]});
   });
   button('Variables','Inspect the current Python namespace',async()=>{
-    app.shell.activateById(panel.id);
-    await app.commands.execute('jupyterlite-touch-tools:show-variables');
+    await app.commands.execute('jupyterlite-touch-tools:show-variables',{widgetId:panel.id});
   });
   const editCommand=command=>async cell=>{
     const editor=await focusCode(cell);
