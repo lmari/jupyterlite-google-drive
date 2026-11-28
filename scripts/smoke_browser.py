@@ -49,24 +49,20 @@ def main():
                         expect(page.locator("#jupyterlite-google-drive-menu .lm-Menu-item").filter(has_text="Open folder")).to_have_class(re.compile("lm-mod-disabled"))
                         page.keyboard.press("Escape")
                         page.keyboard.press("Escape")
+                        # The unconfigured build cannot execute Open folder.
+                        # Use the actual offline status command to activate the panel,
+                        # rather than toggling the JupyterLab sidebar tab.
                         workspace=page.locator("#jupyterlite-google-drive-sidebar")
-                        # A selected sidebar tab toggles the sidebar closed when
-                        # clicked. Only click if the panel is not already visible.
-                        tab=page.get_by_role("tab",name="Drive",exact=True)
-                        expect(tab).to_be_visible()
-                        if not workspace.is_visible():
-                            tab.click()
-                            if not workspace.is_visible():
-                                # The click may have selected an already-collapsed tab.
-                                tab.click()
-                        expect(workspace).to_be_visible(timeout=30000)
-                        expect(workspace.get_by_role("heading",name="Google Drive",exact=True)).to_be_visible()
-                        expect(workspace.get_by_role("status")).to_contain_text("Configuration unavailable",timeout=30000)
                         expect(workspace.get_by_role("heading",name="Current notebook")).to_have_count(0)
                         expect(workspace.get_by_role("button",name="Refresh folder")).to_be_disabled()
                         page.locator(".lm-MenuBar-item").filter(has_text="File").first.click()
                         page.locator(".lm-Menu:visible").first.get_by_text("Google Drive (advanced)",exact=True).hover()
-                        page.locator("#jupyterlite-google-drive-advanced-menu").get_by_text("Notebook and data status",exact=True).click()
+                        submenu=page.locator("#jupyterlite-google-drive-advanced-menu")
+                        expect(submenu).to_be_visible(timeout=30000)
+                        submenu.get_by_text("Notebook and data status",exact=True).click()
+                        expect(workspace).to_be_visible(timeout=30000)
+                        expect(workspace.get_by_role("heading",name="Google Drive",exact=True)).to_be_visible()
+                        expect(workspace.get_by_role("status")).to_contain_text("Configuration unavailable",timeout=30000)
                         expect(workspace.get_by_role("button",name="Connect to Google Drive")).to_be_disabled()
                         advanced=workspace.locator("details").filter(has_text="Advanced actions")
                         expect(advanced).to_be_visible()
