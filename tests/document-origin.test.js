@@ -11,7 +11,7 @@ test('decoration preserves title label and unrelated metadata, updates caption w
   const title={label:'dati.csv',dataset:{id:'widget'},caption:'File: dati.csv',icon:'file'};
   decorateDocument(title,'linked');
   assert.equal(title.label,'dati.csv');assert.equal(title.icon,'file');
-  assert.deepEqual(title.dataset,{id:'widget',driveOrigin:'linked'});
+  assert.deepEqual(title.dataset,{id:'widget','drive-origin':'linked'});
   assert.match(title.caption,/standard Save is local/);
   decorateDocument(title,'local');decorateDocument(title,'local');
   assert.equal(title.caption.split('\n').length,2);

@@ -65,6 +65,10 @@ def main():
                         expect(workspace.get_by_role("heading",name="Google Drive",exact=True)).to_be_visible()
                         expect(workspace.get_by_role("status")).to_contain_text("Configuration unavailable",timeout=30000)
                         expect(page.get_by_role("tab",name="welcome.ipynb",exact=True)).to_have_attribute("data-drive-origin","local",timeout=30000)
+                        # Verify the icon is actually rendered, not just its state attribute.
+                        tab=page.get_by_role("tab",name="welcome.ipynb",exact=True)
+                        assert tab.locator(".lm-TabBar-tabLabel").evaluate("(el) => getComputedStyle(el, '::after').backgroundImage").startswith('url(')
+                        expect(tab).to_have_attribute("title",re.compile("Storage: Local document"))
                         expect(workspace.get_by_role("button",name="Connect to Google Drive")).to_be_disabled()
                         advanced=workspace.locator("details").filter(has_text="Advanced actions")
                         expect(advanced).to_be_visible()

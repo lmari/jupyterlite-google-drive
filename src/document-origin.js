@@ -13,7 +13,7 @@ const descriptions={
 };
 const marker='Storage: ';
 export function decorateDocument(title,origin) {
-  if(title.dataset.driveOrigin!==origin) title.dataset={...title.dataset,driveOrigin:origin};
+  if(title.dataset['drive-origin']!==origin) title.dataset={...title.dataset,'drive-origin':origin};
   const base=(title.caption||'').split('\n').filter(line=>!line.startsWith(marker)).join('\n');
   const caption=[base,marker+descriptions[origin]].filter(Boolean).join('\n');
   if(title.caption!==caption) title.caption=caption;
