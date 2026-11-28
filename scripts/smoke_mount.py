@@ -68,6 +68,13 @@ def main():
                         dialog(page,"Experimental remote editor")
                         dialog(page,"Opened native notebook")
                         command(page,"Notebook and data status")
+                        expect(workspace.get_by_role("heading",name="Current notebook")).to_be_visible()
+                        command(page,"Open folder")
+                        expect(workspace.get_by_role("list",name="Folder contents")).to_be_visible()
+                        expect(workspace.get_by_role("heading",name="Current notebook")).to_have_count(0)
+                        expect(workspace.get_by_role("button",name="Open remote.ipynb",exact=True)).to_be_enabled()
+                        command(page,"Notebook and data status")
+                        expect(workspace.get_by_role("heading",name="Current notebook")).to_be_visible()
                         cell=page.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
                         expect(cell).to_have_text("40 + 2")
                         page.evaluate("window.__drivePickId = 'data-file'")

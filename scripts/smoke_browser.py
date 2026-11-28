@@ -49,8 +49,16 @@ def main():
                         expect(page.locator("#jupyterlite-google-drive-menu .lm-Menu-item").filter(has_text="Open folder")).to_have_class(re.compile("lm-mod-disabled"))
                         page.keyboard.press("Escape")
                         page.keyboard.press("Escape")
-                        page.locator(".lm-TabBar-tab").filter(has_text=re.compile(r"^Drive$")).first.click()
                         workspace=page.locator("#jupyterlite-google-drive-sidebar")
+                        # A selected sidebar tab toggles the sidebar closed when
+                        # clicked. Only click if the panel is not already visible.
+                        tab=page.get_by_role("tab",name="Drive",exact=True)
+                        expect(tab).to_be_visible()
+                        if not workspace.is_visible():
+                            tab.click()
+                            if not workspace.is_visible():
+                                # The click may have selected an already-collapsed tab.
+                                tab.click()
                         expect(workspace).to_be_visible(timeout=30000)
                         expect(workspace.get_by_role("heading",name="Google Drive",exact=True)).to_be_visible()
                         expect(workspace.get_by_role("status")).to_contain_text("Configuration unavailable",timeout=30000)
