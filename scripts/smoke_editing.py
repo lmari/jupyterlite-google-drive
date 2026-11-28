@@ -71,12 +71,16 @@ def main():
                         expect(inspector).to_contain_text(re.compile("arithmetic mean",re.I),timeout=30000)
                         inspector.get_by_role("button",name="Close",exact=True).tap()
                         expect(inspector).to_be_hidden()
-                        # Undo and redo via touch, then prepare a known namespace.
+                        # Undo and redo via touch. Wait beyond the Yjs capture
+                        # window to separate this edit from completion history.
+                        page.wait_for_timeout(600)
+                        expect(code).to_have_text("statistics.mean")
                         code.tap()
                         page.keyboard.press("Control+a")
                         page.keyboard.insert_text("dati = [2, 4, 6, 8, 10]")
+                        expect(code).to_have_text("dati = [2, 4, 6, 8, 10]")
                         bar.get_by_role("button",name="Undo",exact=True).tap()
-                        expect(code).not_to_have_text("dati = [2, 4, 6, 8, 10]")
+                        expect(code).to_have_text("statistics.mean")
                         bar.get_by_role("button",name="Redo",exact=True).tap()
                         expect(code).to_have_text("dati = [2, 4, 6, 8, 10]")
                         code.tap()
@@ -108,6 +112,7 @@ def main():
                     except Exception:
                         print("Visible dialogs:",page.locator(".jp-Dialog:visible").all_text_contents())
                         print("Editing toolbar status:",page.locator(".jp-TouchEditingTools [role=status]").all_text_contents())
+                        print("Variable inspector status:",page.locator("#jupyterlite-python-variables [role=status]").all_text_contents())
                         page.screenshot(path=str(ROOT/"editing-failure.png"),full_page=True)
                         raise
                     finally:

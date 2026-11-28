@@ -3,7 +3,7 @@ import {INotebookTracker} from '@jupyterlab/notebook';
 import {showDialog,Dialog} from '@jupyterlab/apputils';
 import {Text} from '@jupyterlab/coreutils';
 import {Widget} from '@lumino/widgets';
-import {indentMore, indentLess, undo, redo} from '@codemirror/commands';
+import {indentMore, indentLess} from '@codemirror/commands';
 
 const COMPLETE='completer:invoke-notebook';
 
@@ -113,8 +113,16 @@ function install(app,panel) {
   };
   button('Indent','Indent selected Python lines',editCommand(indentMore));
   button('Dedent','Dedent selected Python lines',editCommand(indentLess));
-  button('Undo','Undo the latest code edit',editCommand(undo));
-  button('Redo','Redo the latest code edit',editCommand(redo));
+  // JupyterLab's CodeMirror editor uses the shared Yjs model for history,
+  // not CodeMirror's independent history extension. Use its public methods.
+  button('Undo','Undo the latest code edit',async cell=>{
+    const editor=await focusCode(cell);
+    editor?.undo();
+  });
+  button('Redo','Redo the latest code edit',async cell=>{
+    const editor=await focusCode(cell);
+    editor?.redo();
+  });
   button('Edit Markdown','Edit the selected Markdown cell',async cell=>{
     cell=await readyCell(cell);
     if(!cell||cell.model.type!=='markdown')return;
