@@ -1,6 +1,6 @@
 {
   "name": "jupyterlite-google-drive",
-  "version": "0.6.0-beta.12",
+  "version": "0.6.0-beta.13",
   "description": "Browser-only JupyterLite notebook persistence and Python data import from Google Drive",
   "license": "BSD-3-Clause",
   "type": "module",

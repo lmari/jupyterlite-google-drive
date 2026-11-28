@@ -117,6 +117,13 @@ export class DriveSidebar extends Widget {
         const note=element('div','Only files authorized for this app are visible.');
         note.style.color='var(--jp-ui-font-color2)';
         body.append(note);
+        if(s.hasNotebook) {
+          const hint=element('div',s.isNative
+            ? 'Python: /drive/<filename> reads the current remote folder.'
+            : 'This notebook is local: Python /drive/ reads browser storage. Open a notebook from this remote folder for live Google Drive reads.');
+          hint.style.color='var(--jp-ui-font-color2)';
+          body.append(hint);
+        }
       }
       this.node.replaceChildren(body);
       return;

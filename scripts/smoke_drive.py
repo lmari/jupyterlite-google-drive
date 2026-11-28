@@ -58,6 +58,7 @@ class FakeDrive:
         self.expire_original_token = False
         self.csv_data = "x,y\n2,3\n4,5\n"
         self.csv_version = 1
+        self.workspace_list_reads = 0
 
     def metadata(self):
         return {"id":"demo-file", "name":"remote.ipynb", "version":str(self.version),
@@ -100,6 +101,7 @@ class FakeDrive:
             if "'root' in parents" in query:
                 value = {"files":[{"id":"workspace","name":"JupyterLite","mimeType":"application/vnd.google-apps.folder"}]}
             elif "'workspace' in parents" in query:
+                self.workspace_list_reads += 1
                 value = {"files":[self.metadata(), {"id":"data-file","name":"dati.csv","mimeType":"text/csv"},
                                   {"id":"subfolder","name":"Exercises","mimeType":"application/vnd.google-apps.folder"}]}
             elif "'subfolder' in parents" in query:

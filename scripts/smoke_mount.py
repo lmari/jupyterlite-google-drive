@@ -51,6 +51,7 @@ def main():
                             # Registration alone is insufficient: the page must be controlled.
                             page.wait_for_function("navigator.serviceWorker.controller !== null",timeout=60000)
                         print("Testing DriveFS transport:",args.transport)
+                        assert fake.workspace_list_reads > 0, "Connect must initialize the remote folder before Open folder"
                         command(page,"Open folder")
                         workspace=page.locator("#jupyterlite-google-drive-sidebar")
                         expect(workspace.get_by_role("status")).to_have_text("Authorized")

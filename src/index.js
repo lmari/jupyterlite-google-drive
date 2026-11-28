@@ -101,6 +101,13 @@ const plugin = {
       requireClosed();
       if (!(await confirmOutputDiscard())) return;
       await auth.connect(); links = new WeakMap(); dataLinks=new WeakMap(); native.reset(); clearList();
+      // Initialize the remote root even if the user opens a native notebook
+      // via Picker rather than visiting the folder browser first.
+      try { await loadFolder(); }
+      catch(e) {
+        await tell('Google Drive','Connected. Could not load JupyterLite: '+String(e.message||e)+'. Retry with Open folder.');
+        return;
+      }
       await tell('Google Drive', 'Connected. Choose Open folder to browse JupyterLite.');
     });
     const renew = add('renew','Google Drive: Renew authorization',async()=>{
@@ -156,6 +163,7 @@ const plugin = {
       const id = args.fileId ? authorizedFiles.find(f=>f.id===args.fileId)?.id : await auth.pick();
       if (args.fileId && !id) throw new Error('Refresh the authorized notebook list first.');
       if (!id) return;
+      if(!listLoaded) await loadFolder();
       const meta = await drive.metadata(id);
       if (meta.trashed || !/\.ipynb$/i.test(meta.name)) throw new Error('Select a non-trashed .ipynb file.');
       const path = native.mount(id, meta.name);
