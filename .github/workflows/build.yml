@@ -40,12 +40,14 @@ jobs:
           npm test
       - name: Build unconfigured demo
         run: python scripts/build_demo.py
-      - name: Install Chromium
-        run: python -m playwright install --with-deps chromium
+      - name: Install Chromium and Firefox
+        run: python -m playwright install --with-deps chromium firefox
       - name: Test menu activation in browser
         run: python scripts/smoke_browser.py
       - name: Test touch editing tools and real Python completion
         run: python scripts/smoke_editing.py
+      - name: Test Variables dialog on portrait touch viewports
+        run: python scripts/smoke_variables_touch.py
       - name: Test two-browser Drive round trip (mocked Google)
         run: python scripts/smoke_drive.py
       - name: Test mounted Python data through isolated DriveFS
@@ -72,6 +74,7 @@ jobs:
           path: |
             smoke-failure.png
             editing-failure.png
+            variables-touch-*.png
             drive-failure-*.png
             mount-failure*.png
           if-no-files-found: ignore

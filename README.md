@@ -2,13 +2,13 @@
 
 A browser-only JupyterLab extension for JupyterLite that connects Python notebooks and their data to Google Drive. Work in a web browser, keep notebooks on Drive, and resume work on another device. No JupyterLite fork, application backend, or local Python installation is required for end users.
 
-**Current version: 0.6.0-beta.5 (experimental candidate).** Built for JupyterLite 0.9.0b2, JupyterLab 4.7.0b2, Pyodide kernel 0.9.0b0 and Lumino Widgets 2.10.0.
+**Current version: 0.6.0-beta.6 (experimental candidate).** Built for JupyterLite 0.9.0b2, JupyterLab 4.7.0b2, Pyodide kernel 0.9.0b0 and Lumino Widgets 2.10.0.
 
 **[Open the live demo](https://lmari.github.io/jupyterlite-google-drive/lab/index.html)** · [Student quickstart (Italian)](docs/student-quickstart-it.md) · [Install the extension](docs/distribution.md) · [Google Cloud setup](#google-cloud-setup)
 
 ## Status and scope
 
-The preceding validated deployment passed [47 unit tests, browser integration tests and independent wheel installation](https://github.com/lmari/jupyterlite-google-drive/actions/runs/46134842839), including actual Python execution and both JupyterLite filesystem transports. The preceding candidate passed editing and Drive regression tests. [Comparative touch tests](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45910895067) also passed in touch-enabled Chromium and Firefox after the runtime upgrade. These tests use desktop browser engines and mocked Google services, not physical tablets or real Google accounts. A real Google account has been used successfully during development; full acceptance of the current release remains outstanding.
+The preceding validated deployment passed [49 unit tests, browser integration tests and independent wheel installation](https://github.com/lmari/jupyterlite-google-drive/actions/runs/46137439491), including actual Python execution and both JupyterLite filesystem transports. The preceding version passed editing, variable snapshot and Drive regression tests and was deployed. [Comparative touch tests](https://github.com/lmari/jupyterlite-google-drive/actions/runs/45910895067) also passed in touch-enabled Chromium and Firefox after the runtime upgrade. These tests use desktop browser engines and mocked Google services, not physical tablets or real Google accounts. A real Google account has been used successfully during development; full acceptance of the current release remains outstanding.
 
 This is an experimental classroom candidate. Use disposable notebooks and non-sensitive data; do not rely on it for production, sensitive information or collaborative editing. See the [real-account acceptance checklist](docs/acceptance.md).
 
@@ -32,7 +32,7 @@ A separate frontend plugin, packaged with the Drive extension, adds a compact ed
 
 ## Python variables
 
-Choose **Variables** in the editing toolbar to open the right sidebar. After running code, tap **Refresh variables** to obtain a snapshot of the active notebook's idle Pyodide kernel. It shows names, types and bounded previews (up to 100 variables; short lists and tuples, scalar values, and summaries for other containers). Arbitrary objects are not evaluated or formatted using their custom repr methods. Refresh is explicit; running code marks the snapshot potentially outdated, and a notebook or kernel change clears it. The inspection uses a fixed local Python request, not a new notebook cell or an external service. Pyodide may record the inspection request in IPython history despite the request not to store it. No variables are saved to Drive or persisted by the inspector. Use only trusted kernels and non-sensitive data.
+Choose **Variables** in the editing toolbar to open a touch-friendly dialog for the notebook that owns the toolbar. If its Pyodide kernel is idle, opening the dialog requests a snapshot immediately; otherwise start the kernel, run code and reopen it. The **Refresh variables** button explicitly obtains a new snapshot when the kernel is idle. The separate **Variables** tab on the right remains available for a persistent sidebar view while editing on larger screens. It shows names, types and bounded previews (up to 100 variables; short lists and tuples, scalar values, and summaries for other containers). Arbitrary objects are not evaluated or formatted using their custom repr methods. Refresh is explicit; running code marks the snapshot potentially outdated, and a notebook or kernel change clears it. The inspection uses a fixed local Python request, not a new notebook cell or an external service. Pyodide may record the inspection request in IPython history despite the request not to store it. No variables are saved to Drive or persisted by the inspector. Use only trusted kernels and non-sensitive data.
 
 ## Notebook persistence
 
@@ -255,6 +255,7 @@ python scripts/build_demo.py
 python -m playwright install chromium firefox
 python scripts/smoke_browser.py
 python scripts/smoke_editing.py
+python scripts/smoke_variables_touch.py
 python scripts/smoke_drive.py
 python scripts/smoke_mount.py
 python scripts/smoke_mount.py --transport service-worker

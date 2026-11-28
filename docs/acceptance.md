@@ -41,7 +41,7 @@ Use only disposable notebooks and non-sensitive data. CI uses actual JupyterLite
 
 ## Record results
 
-Record browser/version, OS, deployment commit, date, step number, actual result, and sanitized error. Mark pass/fail/not tested separately for each step. Never paste access tokens, private file IDs or sensitive notebook data. Test mobile separately if intended for classroom use. On a physical tablet, use touch only to open File, open and activate both Drive submenus, open the native New submenu, and execute a command. Verify notebook editing and saving with the toolbar as well as local recovery. Record results for each browser; desktop touch emulation is not a substitute.
+Record browser/version, OS, deployment commit, date, step number, actual result, and sanitized error. Mark pass/fail/not tested separately for each step. Never paste access tokens, private file IDs or sensitive notebook data. Test mobile separately if intended for classroom use. On a physical tablet, use touch only to open File, open and activate both Drive submenus, open the native New submenu, and execute a command. Verify notebook editing and saving with the toolbar as well as local recovery. Tap Variables in both a code and a Markdown cell, before and after executing Python. Verify that the dialog opens even with the right sidebar hidden, displays the current notebook's values, and can be closed and reopened. Record results for each browser; desktop touch emulation is not a substitute.
 
 ## Release gate
 

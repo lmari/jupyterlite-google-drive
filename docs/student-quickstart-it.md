@@ -15,7 +15,7 @@ Seleziona una cella Python: la barra Editing offre Complete, Help, Indent, Deden
 
 ## Osservare le variabili Python
 
-Dopo aver eseguito una cella, usa Variables nella barra Editing e Refresh variables nel pannello a destra. Puoi osservare nomi, tipi e valori abbreviati delle variabili del kernel corrente. Dopo una nuova esecuzione aggiorna esplicitamente il pannello. Il pannello non salva lo stato del kernel su Drive.
+Dopo aver eseguito una cella, usa Variables nella barra Editing: si apre una finestra con i valori correnti, se il kernel è pronto. Refresh variables aggiorna la fotografia; Close chiude la finestra. Per mantenere i valori visibili durante il lavoro, puoi usare separatamente la scheda Variables nella barra laterale destra. Puoi osservare nomi, tipi e valori abbreviati delle variabili del kernel corrente. Dopo una nuova esecuzione aggiorna esplicitamente il pannello. Il pannello non salva lo stato del kernel su Drive.
 
 ## Se qualcosa non funziona
 

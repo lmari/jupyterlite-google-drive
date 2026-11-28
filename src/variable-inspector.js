@@ -1,4 +1,5 @@
 import {INotebookTracker} from '@jupyterlab/notebook';
+import {showDialog,Dialog} from '@jupyterlab/apputils';
 import {Widget} from '@lumino/widgets';
 import {tableIcon} from '@jupyterlab/ui-components';
 import {inspectVariables} from './variable-snapshot.js';
@@ -11,13 +12,17 @@ const el=(tag,text)=>{
 };
 
 class VariablesPanel extends Widget {
-  constructor(tracker){
+  constructor(tracker,{notebook=null,modal=false}={}){
     super({node:el('section')});
-    this.id='jupyterlite-python-variables';
+    this.id=modal?'jupyterlite-python-variables-dialog':'jupyterlite-python-variables';
     this.title.label='Variables';this.title.caption='Python variables';this.title.icon=tableIcon;
     this.node.setAttribute('aria-label','Python variables');
     Object.assign(this.node.style,{padding:'12px',overflow:'auto',fontSize:'var(--jp-ui-font-size1)',color:'var(--jp-ui-font-color1)',background:'var(--jp-layout-color1)'});
     this.heading=el('h2','Python variables');
+    if(modal){
+      this.heading.hidden=true;
+      Object.assign(this.node.style,{boxSizing:'border-box',width:'min(76vw, 560px)',maxHeight:'52vh',padding:'8px 0'});
+    }
     this.name=el('div','No active notebook');
     this.refreshButton=el('button','Refresh variables');
     this.refreshButton.type='button';this.refreshButton.className='jp-mod-styled';
@@ -28,8 +33,16 @@ class VariablesPanel extends Widget {
     this.node.append(this.heading,this.name,this.refreshButton,this.status,this.results);
     this.panel=null;this.kernel=null;this.generation=0;this.pending=false;this.snapshot=null;
     this.refreshButton.addEventListener('click',()=>void this.refresh());
-    tracker.currentChanged.connect((_,p)=>this.bind(p),this);
-    this.bind(tracker.currentWidget);
+    if(tracker)tracker.currentChanged.connect((_,p)=>this.bind(p),this);
+    this.bind(notebook??tracker?.currentWidget??null);
+    this.updateButton();
+  }
+  dispose(){
+    if(this.isDisposed)return;
+    // Invalidate a pending reply and detach the notebook listeners before
+    // disposal. Modal instances are short-lived and must not retain kernels.
+    this.bind(null);
+    super.dispose();
   }
   bind(panel){
     if(panel===this.panel)return;
@@ -54,7 +67,7 @@ class VariablesPanel extends Widget {
     this.kernel=this.panel?.sessionContext.session?.kernel??null;
     this.results.replaceChildren();
     this.name.textContent=this.panel?.title.label||'No active notebook';
-    this.status.textContent='Run a cell, then refresh to inspect variables.';
+    this.status.textContent=!this.panel?'No active notebook.':!this.kernel?'Start the Python kernel, run a cell, then refresh.':this.kernel.name!=='python'?'Only the Pyodide Python kernel is supported.':'Run a cell, then refresh to inspect variables.';
     this.updateButton();
   }
   onStatus(){
@@ -115,9 +128,34 @@ export default {
   activate(app,tracker){
     const sidebar=new VariablesPanel(tracker);
     app.shell.add(sidebar,'right',{rank:700});
+    let dialogOpen=false;
     app.commands.addCommand(variablesCommand,{
       label:'Show Python variables',
-      execute:()=>{sidebar.bind(tracker.currentWidget);app.shell.activateById(sidebar.id);}
+      execute:async args=>{
+        if(dialogOpen)return;
+        // The toolbar belongs to a particular notebook, not whichever
+        // main-area widget happens to hold focus after the touch.
+        let notebook=null;
+        if(typeof args.widgetId==='string'){
+          tracker.forEach(panel=>{if(panel.id===args.widgetId)notebook=panel;});
+        }else notebook=tracker.currentWidget;
+        if(!notebook||notebook.isDisposed)return;
+        dialogOpen=true;
+        const view=new VariablesPanel(null,{notebook,modal:true});
+        try{
+          // Always show visible feedback, independently of LabShell's
+          // collapsed/hidden sidebars and simple-document layout.
+          const closed=showDialog({title:'Python variables',body:view,
+            buttons:[Dialog.okButton({label:'Close'})]});
+          // Opening Variables is an explicit inspection request. If idle,
+          // populate once; further refreshes are always user initiated.
+          if(!view.refreshButton.disabled)void view.refresh();
+          await closed;
+        }finally{
+          if(!view.isDisposed)view.dispose();
+          dialogOpen=false;
+        }
+      }
     });
   }
 };

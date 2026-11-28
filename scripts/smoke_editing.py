@@ -88,7 +88,16 @@ def main():
                         page.keyboard.insert_text("dati = [2, 4, 6, 8, 10]\nmedia = sum(dati)/len(dati)\nclass Custom:\n    def __repr__(self):\n        raise RuntimeError('repr must not be called')\nobj = Custom()\nprint(media)")
                         page.keyboard.press("Control+Enter")
                         expect(page.locator(".jp-Notebook:visible .jp-CodeCell .jp-OutputArea-output").first).to_have_text("6.0",timeout=60000)
+                        # The toolbar always opens a visible dialog, even if the
+                        # right sidebar is hidden. Opening requests a snapshot.
                         bar.get_by_role("button",name="Variables",exact=True).tap()
+                        dialog=page.locator(".jp-Dialog:visible").filter(has_text="Python variables")
+                        expect(dialog).to_be_visible()
+                        expect(dialog.get_by_role("cell",name="6.0",exact=True)).to_be_visible(timeout=30000)
+                        dialog.get_by_role("button",name="Close",exact=True).tap()
+                        expect(dialog).to_be_hidden()
+                        # The persistent sidebar remains available independently.
+                        page.locator('.lm-TabBar-tab[data-id="jupyterlite-python-variables"]').tap()
                         variables=page.locator("#jupyterlite-python-variables")
                         expect(variables).to_be_visible()
                         refresh=variables.get_by_role("button",name="Refresh variables")
