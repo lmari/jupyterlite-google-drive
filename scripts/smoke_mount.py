@@ -69,6 +69,11 @@ def main():
                         expect(editor).to_be_visible(timeout=30000)
                         expect(editor).to_contain_text("x,y")
                         expect(page.get_by_role("tab",name="dati.csv",exact=True)).to_be_visible()
+                        # The local file browser must show the file in its root.
+                        page.get_by_role("tab",name="File Browser (Ctrl+Shift+F)").click()
+                        expect(page.locator(".jp-DirListing-item").filter(has_text="dati.csv")).to_be_visible(timeout=30000)
+                        command(page,"Open folder")
+                        editor.click()
                         command(page,"Save current datafile")
                         dialog(page,"Overwrite dati.csv")
                         dialog(page,"Saved dati.csv.")

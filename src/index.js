@@ -236,12 +236,16 @@ const plugin = {
       if(!file) throw new Error('Refresh the folder and select a supported text datafile.');
       const {meta,bytes}=await drive.readData(file.id);
       const text=decodeTextData(bytes);
-      // A fresh local directory avoids overwriting existing files, while
-      // preserving the exact basename shown in the editor tab.
+      // Preserve the basename in the local root; never overwrite a local file.
       if(!meta.name || /[\\/:\x00-\x1f]/.test(meta.name) || ['.','..'].includes(meta.name))
         throw new Error('This filename cannot be represented safely in local storage.');
-      const temp=await contents.newUntitled({type:'directory'});
-      const path=temp.path+'/'+meta.name;
+      const root=await contents.get('',{content:true});
+      const occupied=new Set((root.content||[]).map(entry=>entry.name));
+      const dot=meta.name.lastIndexOf('.');
+      const stem=dot>0?meta.name.slice(0,dot):meta.name;
+      const ext=dot>0?meta.name.slice(dot):'';
+      let path=meta.name;
+      for(let i=1;occupied.has(path);i++) path=stem+' ('+i+')'+ext;
       await contents.save(path,{type:'file',format:'text',content:text});
       const widget=docs.openOrReveal(path,'Editor');
       if(!widget) throw new Error('Local datafile copy created but the text editor could not open it.');
@@ -249,6 +253,7 @@ const plugin = {
       if(!context) throw new Error('Datafile editor context unavailable.');
       await context.ready;
       dataLinks.set(context,{id:meta.id,name:meta.name,version:meta.version});
+      if(path!==meta.name) await tell('Google Drive','A local file named '+meta.name+' already exists. Opened '+path+' instead; the remote link still targets '+meta.name+'.');
     });
     const saveCurrentData=add('save-current-datafile','Google Drive: Save current datafile',async()=>{
       const context=activeData();
