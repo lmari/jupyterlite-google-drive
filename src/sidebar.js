@@ -118,9 +118,7 @@ export class DriveSidebar extends Widget {
         note.style.color='var(--jp-ui-font-color2)';
         body.append(note);
         if(s.hasNotebook) {
-          const hint=element('div',s.isNative
-            ? 'Python: /drive/<filename> reads the current remote folder.'
-            : 'This notebook is local: Python /drive/ reads browser storage. Use the advanced Open native notebook command for live Google Drive reads.');
+          const hint=element('div','Python: /local/<filename> reads browser storage; /drive/<filename> reads Google Drive (requires filesystem synchronization).');
           hint.style.color='var(--jp-ui-font-color2)';
           body.append(hint);
         }

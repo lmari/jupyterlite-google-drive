@@ -31,3 +31,5 @@ Beta 11: the current folder's regular authorized datafiles are exposed read-only
 Beta 13: initialize the remote folder on Connect, including when a notebook is subsequently opened through Picker. The folder browser explains whether the active notebook's /drive mount is local or remote. Do not shadow local files with remote names in the default browser-storage drive.
 
 Beta 14: ordinary folder opening uses local copies for both notebooks and text datafiles. Standard Save is local and explicit Google Drive Save updates the associated remote file. Native direct editing remains an advanced operation. A universal independent remote filesystem mount is a separate task.
+
+Beta 15: separate /local and /drive mounts initialized on the first Python execution, using the existing DriveFS transport and routing remote requests to GoogleDrive. Standard local document saves remain unchanged. The mount bootstrap depends on the current upstream DriveFS internals and requires browser acceptance on both transport modes.

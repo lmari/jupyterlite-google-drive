@@ -84,6 +84,16 @@ def main():
                         expect(page.get_by_role("tab",name="remote.ipynb",exact=True)).to_be_visible(timeout=30000)
                         local_cell=page.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
                         expect(local_cell).to_have_text("40 + 2",timeout=30000)
+                        edit_cell(page,local_cell,'import csv; tuple(sum(int(r["x"]) for r in csv.DictReader(open(p))) for p in ("/local/dati.csv","/drive/dati.csv"))')
+                        page.keyboard.press("Control+Enter")
+                        local_output=page.locator(".jp-Notebook:visible .jp-CodeCell .jp-OutputArea-output").first
+                        expect(local_output).to_have_text("(6, 6)",timeout=180000)
+                        fake.csv_data="x,y\n8,3\n9,5\n"
+                        fake.csv_version+=1
+                        page.keyboard.press("Control+Enter")
+                        expect(local_output).to_have_text("(6, 17)",timeout=60000)
+                        fake.csv_data="x,y\n2,3\n4,5\n"
+                        fake.csv_version+=1
                         edit_cell(page,local_cell,"41 + 2")
                         page.keyboard.press("Control+s")
                         assert fake.writes == 0, "Standard Save on a folder-opened notebook must be local"
@@ -103,14 +113,14 @@ def main():
                         expect(workspace.get_by_role("heading",name="Current notebook")).to_be_visible()
                         cell=page.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
                         expect(cell).to_have_text("40 + 2")
-                        edit_cell(page,cell,'import csv; sum(int(r["x"]) for r in csv.DictReader(open("/drive/dati.csv")))')
+                        edit_cell(page,cell,'import csv; tuple(sum(int(r["x"]) for r in csv.DictReader(open(p))) for p in ("/local/dati.csv","/drive/dati.csv"))')
                         page.keyboard.press("Control+Enter")
                         output=page.locator(".jp-Notebook:visible .jp-CodeCell .jp-OutputArea-output").first
-                        expect(output).to_have_text("6",timeout=180000)
+                        expect(output).to_have_text("(6, 6)",timeout=180000)
                         fake.csv_data="x,y\n8,3\n9,5\n"
                         fake.csv_version+=1
                         page.keyboard.press("Control+Enter")
-                        expect(output).to_have_text("17",timeout=60000)
+                        expect(output).to_have_text("(6, 17)",timeout=60000)
                         fake.csv_data="x,y\n2,3\n4,5\n"
                         fake.csv_version+=1
                         page.evaluate("window.__drivePickId = 'data-file'")

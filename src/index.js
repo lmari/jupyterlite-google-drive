@@ -4,6 +4,8 @@ import {IDocumentManager} from '@jupyterlab/docmanager';
 import {IMainMenu} from '@jupyterlab/mainmenu';
 import {INotebookTracker} from '@jupyterlab/notebook';
 import {Menu} from '@lumino/widgets';
+import {IKernelSpecs} from '@jupyterlite/services';
+import {installDualMount} from './dual-mount.js';
 import editingTools from './editing-tools.js';
 import variableInspector from './variable-inspector.js';
 import {GoogleAuth} from './auth.js';
@@ -538,4 +540,10 @@ const plugin = {
     void auth.prepare().then(() => {prepared = true;refreshSidebar();}).catch(e => {preparationError = String(e.message || e);refreshSidebar();});
   }
 };
-export default [plugin,editingTools,variableInspector];
+const dualMountPlugin={
+  id:'jupyterlite-google-drive:dual-mount',
+  autoStart:true,
+  requires:[IKernelSpecs],
+  activate:(_app,specs)=>installDualMount(specs)
+};
+export default [dualMountPlugin,plugin,editingTools,variableInspector];
