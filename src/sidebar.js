@@ -32,7 +32,8 @@ export class DriveSidebar extends Widget {
     globalThis.clearInterval(this.timer);
     super.dispose();
   }
-  show(mode) {
+  // Do not override Lumino Widget.show(), which controls actual visibility.
+  setViewMode(mode) {
     this.mode=mode;
     this.refresh();
   }

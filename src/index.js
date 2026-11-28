@@ -373,12 +373,12 @@ const plugin = {
         folders.push(child);
       }
       authorizedFiles=[];listLoaded=false;
-      sidebar.show('files');
+      sidebar.setViewMode('files');
       app.shell.activateById(sidebar.id);
       await loadFolder();
     });
     const notebookStatus=add('notebook-status','Google Drive: Notebook and data status',async()=>{
-      sidebar.show('status');
+      sidebar.setViewMode('status');
       app.shell.activateById(sidebar.id);
     });
     const newFolder=add('new-folder','Google Drive: New folder',async()=>{
