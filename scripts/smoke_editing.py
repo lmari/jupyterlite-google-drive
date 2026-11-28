@@ -61,10 +61,16 @@ def main():
                         expect(suggestion).to_be_visible(timeout=30000)
                         suggestion.tap()
                         expect(code).to_have_text("statistics.mean")
+                        # Position within the function name and request native kernel inspection.
+                        code.tap()
+                        page.keyboard.press("End")
+                        page.keyboard.press("ArrowLeft")
                         bar.get_by_role("button",name="Help",exact=True).tap()
-                        inspector=page.locator("#jp-inspector")
+                        inspector=page.locator(".jp-Dialog:visible").filter(has_text="Python contextual help")
                         expect(inspector).to_be_visible(timeout=30000)
                         expect(inspector).to_contain_text(re.compile("arithmetic mean",re.I),timeout=30000)
+                        inspector.get_by_role("button",name="Close",exact=True).tap()
+                        expect(inspector).to_be_hidden()
                         print("Touch editing tools verified: Markdown render, indentation, real Python completion and contextual help.")
                     except Exception:
                         print("Visible dialogs:",page.locator(".jp-Dialog:visible").all_text_contents())

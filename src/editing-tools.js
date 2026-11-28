@@ -1,10 +1,11 @@
 // Independent notebook editing plugin: no Drive authorization or storage dependency.
 import {INotebookTracker} from '@jupyterlab/notebook';
+import {showDialog,Dialog} from '@jupyterlab/apputils';
+import {Text} from '@jupyterlab/coreutils';
 import {Widget} from '@lumino/widgets';
 import {indentMore, indentLess, undo, redo} from '@codemirror/commands';
 
 const COMPLETE='completer:invoke-notebook';
-const HELP='inspector:open';
 
 function install(app,panel) {
   const notebook=panel.content;
@@ -67,7 +68,40 @@ function install(app,panel) {
     if(await focusCode(cell))await app.commands.execute(COMPLETE);
   });
   button('Help','Show Python documentation at the cursor',async cell=>{
-    if(await focusCode(cell))await app.commands.execute(HELP,{refresh:true});
+    const editor=await focusCode(cell);
+    if(!editor)return;
+    const kernel=panel.sessionContext.session?.kernel;
+    if(!kernel||kernel.isDisposed||kernel.status!=='idle'){
+      throw new Error('Start the Python kernel and wait until it is idle.');
+    }
+    const source=cell.model.sharedModel.getSource();
+    const offset=editor.getOffsetAt(editor.getCursorPosition());
+    // Native kernel inspection, not an execute request. IPython may treat
+    // a cursor immediately after a token as outside that token.
+    const positions=[offset];
+    if(offset>0&&/[\p{L}\p{N}_]/u.test(source[offset-1])&&
+       !/[\p{L}\p{N}_]/u.test(source[offset]||''))positions.push(offset-1);
+    let documentation='';
+    for(const pos of positions){
+      const reply=await kernel.requestInspect({
+        code:source,cursor_pos:Text.jsIndexToCharIndex(pos,source),detail_level:1
+      });
+      if(panel.isDisposed||notebook.activeCell!==cell||
+         panel.sessionContext.session?.kernel!==kernel||
+         cell.model.sharedModel.getSource()!==source)return;
+      const content=reply.content;
+      if(content.status==='ok'&&content.found&&typeof content.data?.['text/plain']==='string'){
+        documentation=content.data['text/plain'];
+        if(documentation.trim())break;
+      }
+    }
+    const body=new Widget({node:document.createElement('pre')});
+    body.node.textContent=documentation
+      ?documentation.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g,'').slice(0,16000)
+      :'No documentation found at the cursor. Place the cursor inside a function or object name, and run any required imports first.';
+    Object.assign(body.node.style,{whiteSpace:'pre-wrap',overflowWrap:'anywhere',
+      maxHeight:'55vh',maxWidth:'70vw',overflow:'auto',fontSize:'var(--jp-code-font-size)'});
+    await showDialog({title:'Python contextual help',body,buttons:[Dialog.okButton({label:'Close'})]});
   });
   const editCommand=command=>async cell=>{
     const editor=await focusCode(cell);
@@ -100,8 +134,7 @@ function install(app,panel) {
     for(const name of ['Complete','Help','Indent','Dedent','Undo','Redo']){
       const b=buttons.get(name);
       b.hidden=!code;
-      b.disabled=!editable||(name==='Complete'&&!app.commands.hasCommand(COMPLETE))||
-        (name==='Help'&&!app.commands.hasCommand(HELP));
+      b.disabled=!editable||(name==='Complete'&&!app.commands.hasCommand(COMPLETE));
     }
     for(const name of ['Edit Markdown','Render Markdown']){
       const b=buttons.get(name);b.hidden=!markdown;b.disabled=!editable;
