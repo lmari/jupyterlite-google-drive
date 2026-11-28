@@ -100,3 +100,25 @@ test('creates a new binary Drive file via multipart POST, never PATCH',async()=>
   await assert.rejects(api.createData('../bad',Uint8Array.of()),/Invalid/);
   await assert.rejects(api.createData('bad.ipynb',Uint8Array.of()),/Invalid/);
 });
+
+test('workspace root reuses a single authorized folder and refuses ambiguity',async()=>{
+  const f={id:'folder-1',name:'JupyterLite',mimeType:'application/vnd.google-apps.folder'};
+  const {api,calls}=mock({files:[f]});
+  assert.deepEqual(await api.workspaceRoot(),f);
+  assert.match(new URL(calls[0].url).searchParams.get('q'),/'root' in parents/);
+  const duplicate=mock({files:[f,{...f,id:'folder-2'}]});
+  await assert.rejects(duplicate.api.workspaceRoot(),/Multiple/);
+});
+test('creates missing root and uploads notebook inside it',async()=>{
+  const f={id:'folder-1',name:'JupyterLite',mimeType:'application/vnd.google-apps.folder'};
+  const {api,calls}=mock({files:[]},f,meta);
+  const folder=await api.workspaceRoot();
+  assert.deepEqual(JSON.parse(calls[1].opts.body).parents,['root']);
+  await api.create('test',nb,folder.id);
+  assert.match(calls[2].opts.body,/"parents":\["folder-1"\]/);
+});
+test('folder listing follows pagination and scopes every request to parent',async()=>{
+  const {api,calls}=mock({files:[meta],nextPageToken:'next'},{files:[{id:'sub',name:'Sub'}]});
+  assert.deepEqual((await api.listFolder('folder-1')).map(f=>f.id),['abc','sub']);
+  for(const c of calls) assert.match(new URL(c.url).searchParams.get('q'),/'folder-1' in parents/);
+});

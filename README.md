@@ -2,7 +2,7 @@
 
 A browser-only JupyterLab extension for JupyterLite that connects Python notebooks and their data to Google Drive. Work in a web browser, keep notebooks on Drive, and resume work on another device. No JupyterLite fork, application backend, or local Python installation is required for end users.
 
-**Current version: 0.6.0-beta.7 (experimental candidate).** Built for JupyterLite 0.9.0b2, JupyterLab 4.7.0b2, Pyodide kernel 0.9.0b0 and Lumino Widgets 2.10.0.
+**Current version: 0.6.0-beta.8 (experimental candidate).** Built for JupyterLite 0.9.0b2, JupyterLab 4.7.0b2, Pyodide kernel 0.9.0b0 and Lumino Widgets 2.10.0.
 
 **[Open the live demo](https://lmari.github.io/jupyterlite-google-drive/lab/index.html)** · [Student quickstart (Italian)](docs/student-quickstart-it.md) · [Install the extension](docs/distribution.md) · [Google Cloud setup](#google-cloud-setup)
 
@@ -17,7 +17,7 @@ This is an experimental classroom candidate. Use disposable notebooks and non-se
 If you are using an existing deployment, the site operator must configure Google Cloud; end users do not need to create their own Cloud project.
 
 1. Open the demo directly in a browser. Try the local notebook `welcome.ipynb` or the guided Italian exercise `primi-passi.ipynb`.
-2. Open the **Drive** tab in the left sidebar, or choose **File > Google Drive > Show workspace**.
+2. Choose **File > Google Drive > Connect**, then **Open folder**, or open the **Drive** tab in the left sidebar.
 3. Choose **Connect to Google Drive** and authorize the app with an eligible Google account.
 4. To open an existing remote notebook, choose **Choose notebook from Drive…** and select an `.ipynb` in Google Picker. Alternatively, refresh the list of authorized notebooks and open one from the list.
 5. To start from a local notebook, use **Save notebook as new Drive copy**. Refresh the authorized notebook list, then open the new remote copy. The original local editor remains local.
@@ -42,7 +42,7 @@ Choose **Variables** in the editing toolbar to open a touch-friendly dialog for 
 | Local notebook | Create a notebook with JupyterLab | Saves in browser storage |
 | Local copy of a remote notebook | Advanced > Open notebook or Browse authorized notebooks | Saves locally; use Save to original to update the linked Drive file explicitly |
 
-The native editor uses a remote ContentsManager drive, not an automatically synchronized local folder. The sidebar distinguishes loaded, saving, unsaved, acknowledged, read-only and failed states. An edit made during an upload remains unsaved until another save. **Save a new copy** creates a distinct file in My Drive; it does not change the original editor's backing file.
+The native editor uses a remote ContentsManager drive, not an automatically synchronized local folder. The sidebar distinguishes loaded, saving, unsaved, acknowledged, read-only and failed states. An edit made during an upload remains unsaved until another save. **Save a new copy** creates a distinct file in the current JupyterLite folder; it does not change the original editor's backing file.
 
 Native saves and explicit Save to original check the remote file version to reject detected stale writes. This is best-effort conflict detection, not an atomic lock: simultaneous writes can race. Avoid editing the same notebook concurrently. A native editor keeps a single session-only checkpoint of persisted content. Remote rename, deletion and full folder browsing are not supported. The local-copy link is lost when its editor closes, on reload or account switch; local notebook files remain in browser storage.
 
@@ -95,7 +95,7 @@ Path("/drive/output/risultati.csv").write_text(
 )
 ```
 
-Choose **Export output to Drive…** or **Download output locally…** in the sidebar. Export always creates a new file in My Drive, never overwriting an existing file. The temporary source remains available. A lost upload response can lead to duplicate files on retry.
+Choose **Export output to Drive…** or **Download output locally…** in the sidebar. Export always creates a new file in the current JupyterLite folder, never overwriting an existing file. The temporary source remains available. A lost upload response can lead to duplicate files on retry.
 
 Outputs are held in memory, shared by native notebooks during the session, and are not automatically synchronized. They are lost on reload, disconnect or account switch; export or download them first. Limits: 5 MiB per file, 20 MiB in total, 20 files, flat safe filenames excluding notebooks.
 
@@ -232,7 +232,7 @@ For a separate JupyterLite installation using the wheel, put the same JSON confi
 1. Open the site directly, not embedded in another page, using the account you added as a tester.
 2. Open the Drive sidebar. It should show **Not connected**, rather than **Configuration unavailable**.
 3. Choose **Connect to Google Drive**, select the correct account, and grant the requested permission.
-4. Use **Save notebook as new Drive copy** on a disposable local notebook. Verify that a new `.ipynb` appears in My Drive.
+4. Use **Save notebook as new Drive copy** on a disposable local notebook. Verify that a new `.ipynb` appears in the current JupyterLite folder.
 5. Refresh the notebook list, open the new file natively, edit and run a cell, and save. Check the acknowledgment.
 6. On another browser or device, authorize the same account and reopen the saved notebook. Verify the edit and output. Continue with the [acceptance checklist](docs/acceptance.md).
 
