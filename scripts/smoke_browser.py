@@ -53,8 +53,8 @@ def main():
                         # Use the actual offline status command to activate the panel,
                         # rather than toggling the JupyterLab sidebar tab.
                         workspace=page.locator("#jupyterlite-google-drive-sidebar")
-                        expect(workspace.get_by_role("heading",name="Current notebook")).to_have_count(0)
-                        expect(workspace.get_by_role("button",name="Refresh folder")).to_be_disabled()
+                        expect(workspace.locator("h3").filter(has_text=re.compile(r"^Current notebook$"))).to_have_count(0)
+                        expect(workspace.locator("button").filter(has_text=re.compile(r"^Refresh folder$"))).to_be_disabled()
                         page.locator(".lm-MenuBar-item").filter(has_text="File").first.click()
                         page.locator(".lm-Menu:visible").first.get_by_text("Google Drive (advanced)",exact=True).hover()
                         submenu=page.locator("#jupyterlite-google-drive-advanced-menu")
