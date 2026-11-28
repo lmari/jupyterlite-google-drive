@@ -81,6 +81,17 @@ def main():
                         assert fake.csv_version == 2
                         assert fake.csv_data == "x,y\n2,3\n4,5\n"
                         workspace.get_by_role("button",name="Open remote.ipynb",exact=True).click()
+                        expect(page.get_by_role("tab",name="remote.ipynb",exact=True)).to_be_visible(timeout=30000)
+                        local_cell=page.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
+                        expect(local_cell).to_have_text("40 + 2",timeout=30000)
+                        edit_cell(page,local_cell,"41 + 2")
+                        page.keyboard.press("Control+s")
+                        assert fake.writes == 0, "Standard Save on a folder-opened notebook must be local"
+                        page.get_by_role("tab",name="File Browser (Ctrl+Shift+F)").click()
+                        expect(page.locator(".jp-DirListing-item").filter(has_text="remote.ipynb")).to_be_visible(timeout=30000)
+                        command(page,"Open native notebook (experimental)")
+                        dialog(page,"Experimental remote editor")
+                        dialog(page,"Opened native notebook")
                         expect(page.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first).to_have_text("40 + 2",timeout=30000)
                         command(page,"Notebook and data status")
                         expect(workspace.get_by_role("heading",name="Current notebook")).to_be_visible()

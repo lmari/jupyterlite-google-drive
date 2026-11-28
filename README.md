@@ -2,7 +2,7 @@
 
 A browser-only JupyterLab extension for JupyterLite that connects Python notebooks and their data to Google Drive. Work in a web browser, keep notebooks on Drive, and resume work on another device. No JupyterLite fork, application backend, or local Python installation is required for end users.
 
-**Current version: 0.6.0-beta.13 (experimental candidate).** Built for JupyterLite 0.9.0b2, JupyterLab 4.7.0b2, Pyodide kernel 0.9.0b0 and Lumino Widgets 2.10.0.
+**Current version: 0.6.0-beta.14 (experimental candidate).** Built for JupyterLite 0.9.0b2, JupyterLab 4.7.0b2, Pyodide kernel 0.9.0b0 and Lumino Widgets 2.10.0.
 
 **[Open the live demo](https://lmari.github.io/jupyterlite-google-drive/lab/index.html)** · [Student quickstart (Italian)](docs/student-quickstart-it.md) · [Install the extension](docs/distribution.md) · [Google Cloud setup](#google-cloud-setup)
 
@@ -313,3 +313,5 @@ License: [BSD 3-Clause](LICENSE).
 **Beta 11:** datafile editor copies preserve the remote basename in the local root (a numbered suffix is used if the name already exists). In native notebooks with DriveFS synchronization, `/drive/<filename>` reads the current remote folder's authorized regular datafiles, fetching fresh remote bytes on each open. These root aliases are read-only, session-scoped, and ambiguous duplicate names are excluded. Explicit `/drive/data/` mounts remain available and independent. Unsaved editor changes are not visible to Python until uploaded. Folder navigation changes root aliases.
 
 **Beta 13:** Connect initializes the remote folder immediately. In a notebook opened locally, /drive is still the JupyterLite browser-storage filesystem; it is not the remote mount. Open the notebook directly from the Google Drive folder to use live /drive/<filename> reads. Files must be authorized for the app and filesystem synchronization must be active. A folder-browser hint distinguishes the two notebook types.
+
+**Beta 14:** notebooks opened from the folder browser are local copies in the browser-storage root, with the original basename unless it collides. Ctrl+S is local; Save current notebook uploads to the associated remote ID with version checking. The advanced Open native notebook command retains direct remote editing and live remote /drive reads. Local notebooks still use JupyterLite's local /drive mount; a separate universal remote filesystem is not yet implemented.

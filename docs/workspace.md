@@ -29,3 +29,5 @@ Beta 10: five-command primary menu. Save current notebook updates native noteboo
 Beta 11: the current folder's regular authorized datafiles are exposed read-only at /drive/<filename> in native notebooks. Each read retrieves remote bytes; duplicate names and reserved paths are excluded. Explicit dependency mounts under /drive/data remain stable when browsing other folders. Editor copies retain the original basename in the local root; if the name already exists, a numbered suffix avoids overwriting it.
 
 Beta 13: initialize the remote folder on Connect, including when a notebook is subsequently opened through Picker. The folder browser explains whether the active notebook's /drive mount is local or remote. Do not shadow local files with remote names in the default browser-storage drive.
+
+Beta 14: ordinary folder opening uses local copies for both notebooks and text datafiles. Standard Save is local and explicit Google Drive Save updates the associated remote file. Native direct editing remains an advanced operation. A universal independent remote filesystem mount is a separate task.

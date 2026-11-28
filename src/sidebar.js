@@ -100,7 +100,7 @@ export class DriveSidebar extends Widget {
           const label=(folder?'📁 ':notebook?'📓 ':'📄 ')+file.name+(file.readOnly?' (read-only)':'');
           const datafile=isTextDatafile(file.name)&&!file.mimeType?.startsWith('application/vnd.google-apps.');
           if(folder||notebook||datafile) {
-            const b=button(label,folder?'open-folder':notebook?'native-open':'open-datafile',true,folder?{folderId:file.id}:{fileId:file.id});
+            const b=button(label,folder?'open-folder':notebook?'open-folder-notebook':'open-datafile',true,folder?{folderId:file.id}:{fileId:file.id});
             b.setAttribute('aria-label',(folder?'Open folder ':'Open ')+file.name);
             b.title=file.name;
             b.style.overflowWrap='anywhere';
@@ -120,7 +120,7 @@ export class DriveSidebar extends Widget {
         if(s.hasNotebook) {
           const hint=element('div',s.isNative
             ? 'Python: /drive/<filename> reads the current remote folder.'
-            : 'This notebook is local: Python /drive/ reads browser storage. Open a notebook from this remote folder for live Google Drive reads.');
+            : 'This notebook is local: Python /drive/ reads browser storage. Use the advanced Open native notebook command for live Google Drive reads.');
           hint.style.color='var(--jp-ui-font-color2)';
           body.append(hint);
         }

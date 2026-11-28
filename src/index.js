@@ -115,17 +115,34 @@ const plugin = {
       await auth.renew();
       await tell('Google Drive','Authorization renewed. Open notebooks, mounted data and temporary outputs were preserved. Retry any failed save.');
     });
-    const openRemote = async id => {
+    const localCopyPath=async name=>{
+      // Preserve the basename in the local root; never overwrite a local file.
+      if(!name || /[\\/:\x00-\x1f]/.test(name) || ['.','..'].includes(name))
+        throw new Error('This filename cannot be represented safely in local storage.');
+      const root=await contents.get('',{content:true});
+      const occupied=new Set((root.content||[]).map(entry=>entry.name));
+      const dot=name.lastIndexOf('.');
+      const stem=dot>0?name.slice(0,dot):name;
+      const ext=dot>0?name.slice(dot):'';
+      let path=name;
+      for(let i=1;occupied.has(path);i++) path=stem+' ('+i+')'+ext;
+      return path;
+    };
+    const openRemote = async (id,quiet=false) => {
       const {meta, content} = await drive.read(id);
-      // Unique local copy: never overwrite a local notebook with the same name.
-      const temp = await contents.newUntitled({type: 'notebook'});
-      await contents.save(temp.path, {type: 'notebook', format: 'json', content});
-      const panel = docs.openOrReveal(temp.path, 'Notebook');
+      const path=await localCopyPath(meta.name);
+      await contents.save(path, {type: 'notebook', format: 'json', content});
+      const panel = docs.openOrReveal(path, 'Notebook');
       if (!panel) throw new Error('Local copy created, but editor could not open it.');
       await panel.context.ready;
       links.set(panel, {id: meta.id, name: meta.name, version: meta.version});
-      await tell('Google Drive', `Opened ${meta.name} as ${temp.path}. Use Google Drive: Save to original to update the cloud file.`);
+      if(!quiet || path!==meta.name) await tell('Google Drive', `Opened ${meta.name} as ${path}. Use Google Drive: Save current notebook to update the cloud file.`);
     };
+    add('open-folder-notebook','Google Drive: Open folder notebook',async(args={})=>{
+      const file=authorizedFiles.find(f=>f.id===args.fileId && /\.ipynb$/i.test(f.name) && !f.mimeType?.startsWith('application/vnd.google-apps.'));
+      if(!file) throw new Error('Refresh the folder and select a notebook.');
+      await openRemote(file.id,true);
+    });
     const open = add('open', 'Google Drive: Open notebook', async () => {
       const id = await auth.pick(); if (id) await openRemote(id);
     });
@@ -244,16 +261,7 @@ const plugin = {
       if(!file) throw new Error('Refresh the folder and select a supported text datafile.');
       const {meta,bytes}=await drive.readData(file.id);
       const text=decodeTextData(bytes);
-      // Preserve the basename in the local root; never overwrite a local file.
-      if(!meta.name || /[\\/:\x00-\x1f]/.test(meta.name) || ['.','..'].includes(meta.name))
-        throw new Error('This filename cannot be represented safely in local storage.');
-      const root=await contents.get('',{content:true});
-      const occupied=new Set((root.content||[]).map(entry=>entry.name));
-      const dot=meta.name.lastIndexOf('.');
-      const stem=dot>0?meta.name.slice(0,dot):meta.name;
-      const ext=dot>0?meta.name.slice(dot):'';
-      let path=meta.name;
-      for(let i=1;occupied.has(path);i++) path=stem+' ('+i+')'+ext;
+      const path=await localCopyPath(meta.name);
       await contents.save(path,{type:'file',format:'text',content:text});
       const widget=docs.openOrReveal(path,'Editor');
       if(!widget) throw new Error('Local datafile copy created but the text editor could not open it.');
