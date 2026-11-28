@@ -51,10 +51,10 @@ def main():
                             # Registration alone is insufficient: the page must be controlled.
                             page.wait_for_function("navigator.serviceWorker.controller !== null",timeout=60000)
                         print("Testing DriveFS transport:",args.transport)
-                        command(page,"Show workspace")
+                        command(page,"Open folder")
                         workspace=page.locator("#jupyterlite-google-drive-sidebar")
                         expect(workspace.get_by_role("status")).to_have_text("Authorized")
-                        workspace.get_by_role("button",name="Refresh notebook list").click()
+                        workspace.get_by_role("button",name="Refresh folder").click()
                         expect(workspace.get_by_role("button",name="Open remote.ipynb",exact=True)).to_be_enabled(timeout=30000)
                         workspace.get_by_role("button",name="Open remote.ipynb",exact=True).click()
                         dialog(page,"Experimental remote editor")
@@ -92,13 +92,13 @@ def main():
                         expect(modal.locator("select option").first).to_have_text("output/result.bin")
                         modal.locator(".jp-Dialog-button.jp-mod-accept").click()
                         dialog(page,"Create new file on Google Drive?")
-                        dialog(page,"Created result.bin in My Drive.")
+                        dialog(page,"Created result.bin in JupyterLite")
                         assert fake.created_data == [("result.bin",bytes([0,255,128,65]))]
                         assert fake.writes == 0
                         print("Python output exported as a new binary file, without overwriting Drive data.")
                         # Expired token, wrong account, then same-account renewal.
                         fake.expire_original_token=True
-                        workspace.get_by_role("button",name="Refresh notebook list").click()
+                        workspace.get_by_role("button",name="Refresh folder").click()
                         dialog(page,"Drive request failed (401)")
                         expect(workspace.get_by_role("status")).to_have_text("Authorization expired")
                         assert page.evaluate("!window.dispatchEvent(new Event('beforeunload',{cancelable:true}))")
@@ -167,7 +167,7 @@ def main():
                         command(page,"Open native notebook (experimental)")
                         dialog(page,"Experimental remote editor")
                         dialog(page,"Opened native notebook")
-                        command(page,"Show workspace")
+                        command(page,"Open folder")
                         workspace=page.locator("#jupyterlite-google-drive-sidebar")
                         expect(workspace.get_by_text("Recorded: /drive/data/dati.csv",exact=True)).to_be_visible()
                         expect(workspace.locator("[data-dependency-state]")).to_have_attribute("data-dependency-state","not-mounted")

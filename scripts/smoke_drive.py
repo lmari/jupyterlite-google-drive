@@ -95,7 +95,11 @@ class FakeDrive:
                 return
             value={"id":"other-data","name":"other.csv","version":"1","mimeType":"text/csv","size":"5","trashed":False}
         elif url.path == "/drive/v3/files" and req.method == "GET":
-            value = {"files":[self.metadata(), {"id":"other","name":"ignore.csv"}]}
+            query = parse_qs(url.query).get("q", [""])[0]
+            if "'root' in parents" in query:
+                value = {"files":[{"id":"workspace","name":"JupyterLite","mimeType":"application/vnd.google-apps.folder"}]}
+            else:
+                value = {"files":[self.metadata(), {"id":"other","name":"ignore.csv"}]}
         elif url.path == "/drive/v3/files/demo-file" and req.method == "GET":
             value = self.notebook if parse_qs(url.query).get("alt") == ["media"] else self.metadata()
         elif url.path == "/upload/drive/v3/files" and req.method == "POST":
@@ -103,6 +107,7 @@ class FakeDrive:
             parts = list(BytesParser(policy=policy.default).parsebytes(header + req.post_data_buffer).iter_parts())
             assert len(parts) == 2
             metadata = json.loads(parts[0].get_payload(decode=True))
+            assert metadata.get("parents") == ["workspace"]
             data_bytes = parts[1].get_payload(decode=True)
             self.created_data.append((metadata["name"], data_bytes))
             value = {"id":"new-data-" + str(len(self.created_data)), "name":metadata["name"], "version":"1"}
@@ -258,7 +263,7 @@ def main():
                         dialog(a, "Opened native notebook")
                         cell = a.locator(".jp-Notebook:visible .jp-CodeCell .cm-content").first
                         expect(cell).to_have_text("6 * 7")
-                        command(a, "Show workspace")
+                        command(a, "Open folder")
                         workspace=a.locator("#jupyterlite-google-drive-sidebar")
                         save_state=workspace.locator("[data-save-state]")
                         cell.click()
