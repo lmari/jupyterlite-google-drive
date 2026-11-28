@@ -13,7 +13,10 @@ function install(app,panel) {
   bar.node.setAttribute('role','toolbar');
   bar.node.setAttribute('aria-label','Notebook editing tools');
   Object.assign(bar.node.style,{
-    display:'flex',flexWrap:'wrap',alignItems:'center',gap:'4px',
+    // Lumino measures minimum sizes, not the natural height of a flex row.
+    // Reserve room explicitly so notebook content never overlays the controls.
+    display:'flex',flexWrap:'nowrap',alignItems:'center',gap:'4px',
+    boxSizing:'border-box',minHeight:'46px',minWidth:'0',overflowX:'auto',overflowY:'hidden',
     padding:'4px 8px',borderBottom:'1px solid var(--jp-border-color2)',
     background:'var(--jp-layout-color1)',color:'var(--jp-ui-font-color1)'
   });
@@ -37,7 +40,7 @@ function install(app,panel) {
     b.type='button'; b.textContent=name; b.title=caption;
     b.className='jp-mod-styled';
     Object.assign(b.style,{
-      minHeight:'36px',padding:'4px 9px',fontSize:'var(--jp-ui-font-size1)',
+      flex:'0 0 auto',minHeight:'36px',padding:'4px 9px',fontSize:'var(--jp-ui-font-size1)',
       touchAction:'manipulation',whiteSpace:'nowrap'
     });
     // Preserve the editor selection on desktop; touch and keyboard use
@@ -109,6 +112,8 @@ function install(app,panel) {
   panel.context.model.stateChanged.connect(refresh,bar);
   app.commands.commandChanged.connect(refresh,bar);
   panel.contentHeader.addWidget(bar);
+  panel.contentHeader.fit();
+  panel.fit();
   refresh();
   void panel.context.ready.then(()=>{if(!bar.isDisposed)refresh();});
 }

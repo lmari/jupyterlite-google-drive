@@ -32,7 +32,11 @@ def main():
                         expect(bar).to_be_visible(timeout=120000)
                         md=page.locator(".jp-Notebook:visible .jp-MarkdownCell").first
                         md.tap()
-                        bar.get_by_role("button",name="Edit Markdown",exact=True).tap()
+                        edit=bar.get_by_role("button",name="Edit Markdown",exact=True)
+                        expect(edit).to_be_enabled()
+                        # Verify the actual hit target, not merely CSS visibility.
+                        assert edit.evaluate("""el => { const r=el.getBoundingClientRect(); return el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)); }"""), "Editing toolbar is covered by notebook content"
+                        edit.tap()
                         expect(md.locator(".cm-content")).to_be_visible()
                         bar.get_by_role("button",name="Render Markdown",exact=True).tap()
                         expect(md.locator(".jp-RenderedMarkdown")).to_be_visible()
@@ -46,7 +50,7 @@ def main():
                         page.keyboard.insert_text("statistics.me")
                         expect(code).to_have_text("statistics.me")
                         bar.get_by_role("button",name="Indent",exact=True).tap()
-                        expect(code).to_have_text(re.compile(r"^\s+statistics\.me$"))
+                        expect(code).to_have_text(re.compile(r"^\s+statistics\.me$"),use_inner_text=False)
                         bar.get_by_role("button",name="Dedent",exact=True).tap()
                         expect(code).to_have_text("statistics.me")
                         # Set an unambiguous end-of-token cursor after indentation.
@@ -64,6 +68,7 @@ def main():
                         print("Touch editing tools verified: Markdown render, indentation, real Python completion and contextual help.")
                     except Exception:
                         print("Visible dialogs:",page.locator(".jp-Dialog:visible").all_text_contents())
+                        print("Editing toolbar status:",page.locator(".jp-TouchEditingTools [role=status]").all_text_contents())
                         page.screenshot(path=str(ROOT/"editing-failure.png"),full_page=True)
                         raise
                     finally:
